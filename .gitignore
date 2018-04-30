@@ -1,0 +1,9 @@
+ignored/
+build/
+dist/
+.DS_Store
+*.pyc
+*.tox
+*.cache
+.pytest_cache
+*egg-info

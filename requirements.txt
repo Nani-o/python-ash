@@ -1,0 +1,11 @@
+certifi
+charset-normalizer
+idna
+prompt_toolkit
+requests
+termcolor
+urllib3
+wcwidth
+pyyaml
+python-dateutil
+jinja2
