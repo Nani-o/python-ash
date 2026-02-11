@@ -35,7 +35,7 @@ class Ash(object):
         self.api = API(baseurl, token)
         self.aap = AAP(self.api)
         self.cache = cache
-        self.load_cache()
+        self._load_all_caches()
         self.current_context = None
         self.colors = COLORS
         self.style = Style.from_dict(self.colors)
@@ -242,7 +242,7 @@ class Ash(object):
     # Refresh command implementation
     def __cmd_cache(self, args):
         self.cache.clean_cache()
-        self.load_cache()
+        self._load_all_caches()
         print("Cache refreshed.")
 
     def __cmd_refresh(self, args):
@@ -299,41 +299,32 @@ class Ash(object):
     def __cmd_template(self, args):
         self.__cd_job_template(str(self.current_context.job_template))
 
-    def load_cache(self):
-        inventories = self.cache.load_cache('inventories')
-        if inventories:
-            print("Loaded inventories from cache, use 'cache' command to refresh.")
-            self.inventories = inventories
+    def _load_cache(self, object_type):
+        objects = self.cache.load_cache(object_type)
+        if objects:
+            print(f"Loaded {object_type} from cache, use 'cache' command to refresh.")
+            return objects
         else:
-            print("Retrieving and caching inventories")
-            self.inventories = self.aap.get_inventories()
-            for inv in self.inventories:
-                self.cache.insert_cache('inventories', inv)
+            print(f"Retrieving and caching {object_type}")
+            method = getattr(self.aap, f'get_{object_type}')
+            objects = method()
+            if not objects:
+                return []
+            for obj in objects:
+                self.cache.insert_cache(object_type, obj)
+            print(f"{len(objects)} {object_type} cached.")
+            return objects
+
+    def _load_all_caches(self):
+        self.inventories = self._load_cache('inventories')
         self.inventories_by_id = {inv.id: inv for inv in self.inventories} if self.inventories else {}
         self.inventories_by_name = {inv.name: inv for inv in self.inventories} if self.inventories else {}
 
-
-        projects = self.cache.load_cache('projects')
-        if projects:
-            print("Loaded projects from cache, use 'cache' command to refresh.")
-            self.projects = projects
-        else:
-            print("Retrieving and caching projects")
-            self.projects = self.aap.get_projects()
-            for proj in self.projects:
-                self.cache.insert_cache('projects', proj)
+        self.projects = self._load_cache('projects')
         self.projects_by_id = {proj.id: proj for proj in self.projects} if self.projects else {}
         self.projects_by_name = {proj.name: proj for proj in self.projects} if self.projects else {}
 
-        job_templates = self.cache.load_cache('job_templates')
-        if job_templates:
-            print("Loaded job templates from cache, use 'cache' command to refresh.")
-            self.job_templates = job_templates
-        else:
-            print("Retrieving and caching job templates")
-            self.job_templates = self.aap.get_job_templates()
-            for jt in self.job_templates:
-                self.cache.insert_cache('job_templates', jt)
+        self.job_templates = self._load_cache('job_templates')
         self.job_templates_by_id = {jt.id: jt for jt in self.job_templates} if self.job_templates else {}
         self.job_templates_by_name = {jt.name: jt for jt in self.job_templates} if self.job_templates else {}
 
