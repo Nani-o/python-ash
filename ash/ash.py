@@ -70,6 +70,12 @@ class Ash(object):
         else:
             return 'white'
 
+    def label_ellipsis(self, label, max_length):
+        if len(label) <= max_length:
+            return label
+        else:
+            return label[:max_length-3] + '...'
+
     def display_jobs(self, jobs):
         len_id = max([len(str(j.id)) for j in jobs] + [len("ID")])
         len_name = max([len(j.name) for j in jobs] + [len("Name")])
@@ -78,14 +84,14 @@ class Ash(object):
         len_created = 11
         len_playbook = max([len(j.playbook) for j in jobs] + [len("Playbook")])
         len_limit = max([len(j.limit) for j in jobs] + [len("Limit")])
-        if len_limit > 20:
-            len_limit = 20
+        if len_limit > 25:
+            len_limit = 25
 
         format_str = f"{{:<{len_id}}}   {{:<{len_created}}}   {{:<{len_limit}}}   {{:<{len_name}}}   {{:<{len_playbook}}}   {{:<{len_scm_branch}}}   {{:<{len_status}}}"
         print(colored(format_str.format("ID", "Created", "Limit", "Name", "Playbook", "Branch", "Status"), attrs=['bold', 'underline']))
         for job in jobs:
             created = dateutil.parser.isoparse(job.created).astimezone().strftime('%d/%m-%H:%M')
-            message = format_str.format(job.id, created, job.limit, job.name, job.playbook, job.scm_branch, job.status)
+            message = format_str.format(job.id, created, self.label_ellipsis(job.limit, len_limit), job.name, job.playbook, job.scm_branch, job.status)
             color = self.status_to_color(job.status)
             print(colored(message, color, attrs=['bold']))
 
