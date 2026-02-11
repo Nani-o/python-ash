@@ -11,7 +11,10 @@ class API(object):
     def __init__(self, baseurl, token):
         self.base_url = baseurl
         self.token = token
-        self.url = f"{self.base_url}/api/v2/"
+        self.api_path = "/api/v2/"
+        if not self.base_url.endswith('/'):
+            self.base_url += '/'
+        self.url = f"{self.base_url}{self.api_path}"
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
@@ -50,10 +53,13 @@ class API(object):
         if response is None or response.status_code != 200:
             return
         data = response.json().get('results', [])
+
         if not result_limit:
             result_limit = response.json().get('count', 0)
+
         while response.json().get('next') and len(data) < result_limit:
-            response = self.get_request(response.json().get('next').replace(self.url, ''))
+            endpoint = response.json().get('next').replace(self.api_path, '')
+            response = self.get_request(endpoint)
             for item in response.json().get('results', []):
                 if len(data) < result_limit:
                     data.append(item)
