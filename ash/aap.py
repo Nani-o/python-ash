@@ -51,6 +51,7 @@ class API(object):
 
         response = self.get_request(url)
         if response is None or response.status_code != 200:
+            print(colored(f"Error retrieving {object_type}: {response.status_code if response else 'No response'}", 'red'))
             return
         data = response.json().get('results', [])
 
@@ -60,6 +61,9 @@ class API(object):
         while response.json().get('next') and len(data) < result_limit:
             endpoint = response.json().get('next').replace(self.api_path, '')
             response = self.get_request(endpoint)
+            if response is None or response.status_code != 200:
+                print(colored(f"Error retrieving {object_type}: {response.status_code if response else 'No response'}", 'red'))
+                return
             for item in response.json().get('results', []):
                 if len(data) < result_limit:
                     data.append(item)
