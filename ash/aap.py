@@ -36,7 +36,7 @@ class API(object):
             print(colored(f"Error connecting to API: {e}", 'red'))
             return None
 
-    def retrieves_objects(self, object_type, result_limit=10, order_by=None, baseuri=None):
+    def retrieves_objects(self, object_type, result_limit=10, order_by=None, baseuri=None, filters=None):
         if not result_limit or result_limit > 100:
             page_size = 100
         else:
@@ -48,7 +48,11 @@ class API(object):
             url = f"{object_type}/?page_size={page_size}"
         if order_by:
             url += f"&order_by={order_by}"
+        if filters:
+            for key, value in filters.items():
+                url += f"&{key}={value}"
 
+        print(url)
         response = self.get_request(url)
         if response is None or response.status_code != 200:
             print(colored(f"Error retrieving {object_type}: {response.status_code if response else 'No response'}", 'red'))
@@ -96,8 +100,8 @@ class AAP(object):
     def get_job_templates(self):
         return self.api.retrieves_objects("job_templates", result_limit=0)
 
-    def get_jobs(self):
-        return list(reversed(self.api.retrieves_objects("jobs", result_limit=50, order_by="-finished")))
+    def get_jobs(self, filters=None, result_limit=50):
+        return list(reversed(self.api.retrieves_objects("jobs", result_limit=result_limit, order_by="-finished", filters=filters)))
 
     def get_job(self, job_id):
         response = self.api.get_request(f"jobs/{job_id}/")

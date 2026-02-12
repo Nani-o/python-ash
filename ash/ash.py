@@ -121,7 +121,20 @@ class Ash(object):
             print(colored(f"JobTemplate[{jt.id}] - {jt.name} - {jt.playbook}", 'cyan'))
 
     def __ls_jobs(self, args):
-        jobs = self.aap.get_jobs()
+        if args:
+            filters = {}
+            for arg in [a.lower() for a in args]:
+                filter = [f for f in LS_JOBS_FILTERS.keys() if arg.startswith(f + ':')]
+                if filter:
+                    filter_key = filter[0]
+                    filter_value = arg.split(':', 1)[1].strip()
+                    filters[filter_key + "__search"] = filter_value
+                else:
+                    print(colored(f"Unknown filter: {arg}", 'red'))
+                    return
+        else:
+            filters = None
+        jobs = self.aap.get_jobs(filters=filters, result_limit=100)
         if jobs:
             self.display_jobs(jobs)
         else:
