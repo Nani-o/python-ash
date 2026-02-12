@@ -310,6 +310,7 @@ class Ash(object):
         job = self.current_context.launch(payload)
 
         if job:
+            print(colored(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'magenta'))
             self.current_context = job
             self.commands = JOB_COMMANDS.copy()
             self.commands.update(ROOT_COMMANDS)
