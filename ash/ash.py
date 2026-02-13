@@ -359,7 +359,7 @@ class Ash(object):
         job = self.current_context.launch(payload)
 
         if job:
-            self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'magenta')
+            self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
             self.__switch_context(job, 'jobs')
             self.__cmd_output([])
 
