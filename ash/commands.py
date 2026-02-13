@@ -69,7 +69,8 @@ LS_JOBS_FILTERS = OrderedDict([
     ('labels', 'Filter by labels associated with the job.'),
     ('inventory', 'Filter by the inventory used in the job.'),
     ('project', 'Filter by the project associated with the job.'),
-    ('organization', 'Filter by the organization that owns the job.')
+    ('organization', 'Filter by the organization that owns the job.'),
+    ('result_limit', 'Limit the number of results returned (e.g., result_limit:100)')
 ])
 
 LS_PROJECTS_FILTERS = OrderedDict([

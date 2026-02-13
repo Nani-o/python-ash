@@ -121,20 +121,32 @@ class Ash(object):
             print(colored(f"JobTemplate[{jt.id}] - {jt.name} - {jt.playbook}", 'cyan'))
 
     def __ls_jobs(self, args):
+        result_limit = 100
         if args:
             filters = {}
             for arg in [a.lower() for a in args]:
-                filter = [f for f in LS_JOBS_FILTERS.keys() if arg.startswith(f + ':')]
-                if filter:
-                    filter_key = filter[0]
-                    filter_value = arg.split(':', 1)[1].strip()
-                    filters[filter_key + "__search"] = filter_value
+                if ':' in arg and arg.split(':', 1)[0] in LS_JOBS_FILTERS.keys():
+                    filter_key, filter_value = arg.split(':', 1)
+                    if filter_key == 'result_limit':
+                        try:
+                            filter_value = int(filter_value)
+                        except ValueError:
+                            print(colored("Invalid result_limit value. It should be an integer.", 'red'))
+                            return
+                        result_limit = filter_value
+                        continue
+                    filter_key = f"{filter_key}__search"
                 else:
-                    print(colored(f"Unknown filter: {arg}", 'red'))
-                    return
+                    filter_key = "search"
+                    filter_value = arg
+
+                if filter_key in filters:
+                    filters[filter_key].append(filter_value)
+                else:
+                    filters[filter_key] = [filter_value]
         else:
             filters = None
-        jobs = self.aap.get_jobs(filters=filters, result_limit=100)
+        jobs = self.aap.get_jobs(filters=filters, result_limit=result_limit)
         if jobs:
             self.display_jobs(jobs)
         else:

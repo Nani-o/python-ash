@@ -50,7 +50,8 @@ class API(object):
             url += f"&order_by={order_by}"
         if filters:
             for key, value in filters.items():
-                url += f"&{key}={value}"
+                for v in value:
+                    url += f"&{key}={v}"
 
         response = self.get_request(url)
         if response is None or response.status_code != 200:
