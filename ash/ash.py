@@ -406,6 +406,8 @@ class Ash(object):
             elif isinstance(self.current_context, Project):
                 prompt.append(('class:orange', f'Project[{self.current_context.id}] - {self.current_context.name} '))
             elif isinstance(self.current_context, Job):
+                if not self.current_context.finished:
+                    self.current_context.refresh()
                 color = self.status_to_color(self.current_context.status)
                 prompt.append((f'class:{color}', f'Job[{self.current_context.id}] - {self.current_context.name} - {self.current_context.status} '))
 
