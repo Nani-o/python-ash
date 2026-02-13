@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit import print_formatted_text
+from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.styles import Style
-from termcolor import colored
 from os.path import expanduser
 
 import json
@@ -28,17 +29,17 @@ class Ash(object):
             'inventories': LS_INVENTORIES_FILTERS
         }
         self.job_template_commands = JT_COMMANDS
-        self.completer = AshCompleter(self)
-        history_file_path = expanduser("~/.ash_history")
-        self.history = FileHistory(history_file_path)
-        self.session = PromptSession(history=self.history, completer=self.completer)
         self.api = API(baseurl, token)
         self.aap = AAP(self.api)
         self.cache = cache
         self._load_all_caches()
         self.current_context = None
         self.colors = COLORS
+        history_file_path = expanduser("~/.ash_history")
+        self.history = FileHistory(history_file_path)
+        self.completer = AshCompleter(self)
         self.style = Style.from_dict(self.colors)
+        self.session = PromptSession(history=self.history, completer=self.completer, style=self.style)
 
     def filter_objects(self, objects, args, filter_definitions):
         if args:
@@ -60,11 +61,19 @@ class Ash(object):
 
         return objects
 
+    def print(self, message, class_name=None, attrs=None):
+        if class_name:
+            print_formatted_text(FormattedText([(f'class:{class_name}', message)]), style=self.style)
+        else:
+            print(message)
+
     def status_to_color(self, status):
         if status == 'successful':
             return 'blue'
-        elif status in ['failed', 'error', 'canceled']:
+        elif status in ['failed', 'error']:
             return 'red'
+        elif status == 'canceled':
+            return 'magenta'
         elif status in ['pending', 'waiting', 'running']:
             return 'yellow'
         else:
@@ -88,12 +97,12 @@ class Ash(object):
             len_limit = 25
 
         format_str = f"{{:<{len_id}}}   {{:<{len_created}}}   {{:<{len_limit}}}   {{:<{len_name}}}   {{:<{len_playbook}}}   {{:<{len_scm_branch}}}   {{:<{len_status}}}"
-        print(colored(format_str.format("ID", "Created", "Limit", "Name", "Playbook", "Branch", "Status"), attrs=['bold', 'underline']))
+        self.print(format_str.format("ID", "Created", "Limit", "Name", "Playbook", "Branch", "Status"), 'headers')
         for job in jobs:
             created = dateutil.parser.isoparse(job.created).astimezone().strftime('%d/%m-%H:%M')
             message = format_str.format(job.id, created, self.label_ellipsis(job.limit, len_limit), job.name, job.playbook, job.scm_branch, job.status)
             color = self.status_to_color(job.status)
-            print(colored(message, color, attrs=['bold']))
+            self.print(message, color + '_bold')
 
     # List command implementations
     def __cmd_ls(self, args):
@@ -118,7 +127,7 @@ class Ash(object):
         job_templates = self.filter_objects(self.job_templates, args, LS_JOB_TEMPLATE_FILTERS)
 
         for jt in job_templates:
-            print(colored(f"JobTemplate[{jt.id}] - {jt.name} - {jt.playbook}", 'cyan'))
+            self.print(f"JobTemplate[{jt.id}] - {jt.name} - {jt.playbook}", 'cyan')
 
     def __ls_jobs(self, args):
         result_limit = 100
@@ -131,7 +140,7 @@ class Ash(object):
                         try:
                             filter_value = int(filter_value)
                         except ValueError:
-                            print(colored("Invalid result_limit value. It should be an integer.", 'red'))
+                            self.print("Invalid result_limit value. It should be an integer.", 'red')
                             return
                         result_limit = filter_value
                         continue
@@ -160,7 +169,7 @@ class Ash(object):
         inventories = self.filter_objects(self.inventories, args, LS_INVENTORIES_FILTERS)
 
         for inv in inventories:
-            print(colored(f"Inventory[{inv.id}] - {inv.name} - {inv.total_hosts} hosts", 'green'))
+            self.print(f"Inventory[{inv.id}] - {inv.name} - {inv.total_hosts} hosts", 'green')
 
     def __ls_projects(self, args):
         if not self.projects:
@@ -170,9 +179,14 @@ class Ash(object):
         projects = self.filter_objects(self.projects, args, LS_PROJECTS_FILTERS)
 
         for proj in projects:
-            print(colored(f"Project[{proj.id}] - {proj.name} - {proj.scm_url}", 'yellow'))
+            self.print(f"Project[{proj.id}] - {proj.name} - {proj.scm_url}", 'orange')
 
-    # Select object command implementations
+    # Change directory command implementations
+    #
+    # Note: The CD commands will attempt to find the specified object by ID first, then by name (case-insensitive, partial match).
+    # If multiple matches are found by name, it will list the matches and ask the user to refine their input.
+    # The context is switched to the specified object and the available commands are updated accordingly.
+
     def __cmd_cd(self, args):
         if len(args) < 2:
             print("Usage: cd <object_type> <name_or_id>")
@@ -198,9 +212,9 @@ class Ash(object):
                 jt = matches[0]
 
         if not jt:
-            print(colored(f"Job Template '{identifier}' not found.", 'red'))
+            self.print(f"Job Template '{identifier}' not found.", 'red')
             return
-        print(colored(f"Switched context to Job Template: ID={jt.id}, Name={jt.name}", 'cyan'))
+        self.print(f"Switched context to Job Template: ID={jt.id}, Name={jt.name}", 'cyan')
         self.current_context = jt
         self.commands = JT_COMMANDS.copy()
         self.commands.update(ROOT_COMMANDS)
@@ -217,9 +231,9 @@ class Ash(object):
                 job = matches[0]
 
         if not job:
-            print(colored(f"Job '{identifier}' not found.", 'red'))
+            self.print(f"Job '{identifier}' not found.", 'red')
             return
-        print(colored(f"Switched context to Job: ID={job.id}, Name={job.name}", 'magenta'))
+        self.print(f"Switched context to Job: ID={job.id}, Name={job.name}", self.status_to_color(job.status))
         self.current_context = job
         self.commands = JOB_COMMANDS.copy()
         self.commands.update(ROOT_COMMANDS)
@@ -235,9 +249,9 @@ class Ash(object):
                 inv = matches[0]
 
         if not inv:
-            print(colored(f"Inventory '{identifier}' not found.", 'red'))
+            self.print(f"Inventory '{identifier}' not found.", 'red')
             return
-        print(colored(f"Switched context to Inventory: ID={inv.id}, Name={inv.name}", 'green'))
+        self.print(f"Switched context to Inventory: ID={inv.id}, Name={inv.name}", 'green')
         self.current_context = inv
         self.commands = INVENTORY_COMMANDS.copy()
         self.commands.update(ROOT_COMMANDS)
@@ -257,20 +271,26 @@ class Ash(object):
                         proj = p
                         break
                 if not proj:
-                    print(colored(f"Multiple projects found matching '{identifier}':", 'red'))
+                    self.print(f"Multiple projects found matching '{identifier}':", 'red')
                     for p in matches:
-                        print(colored(f"ID={p.id}, Name={p.name}", 'red'))
+                        self.print(f"ID={p.id}, Name={p.name}", 'red')
                     return
 
         if not proj:
-            print(colored(f"Project '{identifier}' not found.", 'red'))
+            self.print(f"Project '{identifier}' not found.", 'red')
             return
-        print(colored(f"Switched context to Project: ID={proj.id}, Name={proj.name}", 'yellow'))
+        self.print(f"Switched context to Project: ID={proj.id}, Name={proj.name}", 'orange')
         self.current_context = proj
         self.commands = PROJECT_COMMANDS.copy()
         self.commands.update(ROOT_COMMANDS)
 
-    # Refresh command implementation
+    # Refresh commands implementation
+    #
+    # The 'cache' command will clear the local cache and re-fetch all inventories, projects, and job templates from the API.
+    # The 'refresh' command will refresh the current context, which is useful for updating the details of the current object
+    # without refreshing the entire cache.
+    #
+
     def __cmd_cache(self, args):
         self.cache.clean_cache()
         self._load_all_caches()
@@ -322,7 +342,7 @@ class Ash(object):
         job = self.current_context.launch(payload)
 
         if job:
-            print(colored(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'magenta'))
+            self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'magenta')
             self.current_context = job
             self.commands = JOB_COMMANDS.copy()
             self.commands.update(ROOT_COMMANDS)
@@ -343,7 +363,7 @@ class Ash(object):
             if not objects:
                 return []
             for obj in objects:
-                self.cache.insert_cache(object_type, obj)
+                self.cache.insert_cache(object_type, obj.id, obj)
             print(f"{len(objects)} {object_type} cached.")
             return objects
 
@@ -369,9 +389,10 @@ class Ash(object):
             elif isinstance(self.current_context, Inventory):
                 prompt.append(('class:green', f'Inventory[{self.current_context.id}] - {self.current_context.name} '))
             elif isinstance(self.current_context, Project):
-                prompt.append(('class:yellow', f'Project[{self.current_context.id}] - {self.current_context.name} '))
+                prompt.append(('class:orange', f'Project[{self.current_context.id}] - {self.current_context.name} '))
             elif isinstance(self.current_context, Job):
-                prompt.append(('class:magenta', f'Job[{self.current_context.id}] - {self.current_context.name} '))
+                color = self.status_to_color(self.current_context.status)
+                prompt.append((f'class:{color}', f'Job[{self.current_context.id}] - {self.current_context.name} - {self.current_context.status} '))
 
         prompt.append(('class:white', '> '))
         return prompt
@@ -397,7 +418,7 @@ class Ash(object):
                     try:
                         method(args)
                     except KeyboardInterrupt:
-                        print(colored("\nCommand interrupted by user.", 'red'))
+                        self.print("\nCommand interrupted by user.", 'red')
                 else:
                     print('Command not implemented: {}'.format(command))
             elif command == '':
