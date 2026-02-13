@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from collections import OrderedDict
 from prompt_toolkit import PromptSession
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import FormattedText
@@ -34,6 +35,7 @@ class Ash(object):
         self.cache = cache
         self._load_all_caches()
         self.current_context = None
+        self.current_context_type = None
         self.colors = COLORS
         history_file_path = expanduser("~/.ash_history")
         self.history = FileHistory(history_file_path)
@@ -187,8 +189,29 @@ class Ash(object):
     # If multiple matches are found by name, it will list the matches and ask the user to refine their input.
     # The context is switched to the specified object and the available commands are updated accordingly.
 
+    def __switch_context(self, context, context_type):
+        self.current_context = context
+        self.current_context_type = context_type
+        self.commands = self.__get_commands_for_context(context_type)
+
+    def __get_commands_for_context(self, context_type):
+        if context_type == 'job_templates':
+            return OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        elif context_type == 'jobs':
+            return OrderedDict(list(JOB_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        elif context_type == 'inventories':
+            return OrderedDict(list(INVENTORY_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        elif context_type == 'projects':
+            return OrderedDict(list(PROJECT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        else:
+            return ROOT_COMMANDS.copy()
+
     def __cmd_cd(self, args):
-        if len(args) < 2:
+        if len(args) == 0:
+            self.__switch_context(None, None)
+            print("Switched to root context.")
+            return
+        elif len(args) < 2:
             print("Usage: cd <object_type> <name_or_id>")
             return
 
@@ -215,9 +238,7 @@ class Ash(object):
             self.print(f"Job Template '{identifier}' not found.", 'red')
             return
         self.print(f"Switched context to Job Template: ID={jt.id}, Name={jt.name}", 'cyan')
-        self.current_context = jt
-        self.commands = JT_COMMANDS.copy()
-        self.commands.update(ROOT_COMMANDS)
+        self.__switch_context(jt, 'job_templates')
 
     def __cd_job(self, args):
         identifier = ' '.join(args)
@@ -234,9 +255,7 @@ class Ash(object):
             self.print(f"Job '{identifier}' not found.", 'red')
             return
         self.print(f"Switched context to Job: ID={job.id}, Name={job.name}", self.status_to_color(job.status))
-        self.current_context = job
-        self.commands = JOB_COMMANDS.copy()
-        self.commands.update(ROOT_COMMANDS)
+        self.__switch_context(job, 'jobs')
 
     def __cd_inventory(self, args):
         identifier = ' '.join(args)
@@ -252,9 +271,7 @@ class Ash(object):
             self.print(f"Inventory '{identifier}' not found.", 'red')
             return
         self.print(f"Switched context to Inventory: ID={inv.id}, Name={inv.name}", 'green')
-        self.current_context = inv
-        self.commands = INVENTORY_COMMANDS.copy()
-        self.commands.update(ROOT_COMMANDS)
+        self.__switch_context(inv, 'inventories')
 
     def __cd_project(self, args):
         identifier = ' '.join(args)
@@ -280,9 +297,7 @@ class Ash(object):
             self.print(f"Project '{identifier}' not found.", 'red')
             return
         self.print(f"Switched context to Project: ID={proj.id}, Name={proj.name}", 'orange')
-        self.current_context = proj
-        self.commands = PROJECT_COMMANDS.copy()
-        self.commands.update(ROOT_COMMANDS)
+        self.__switch_context(proj, 'projects')
 
     # Refresh commands implementation
     #
@@ -345,9 +360,7 @@ class Ash(object):
 
         if job:
             self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'magenta')
-            self.current_context = job
-            self.commands = JOB_COMMANDS.copy()
-            self.commands.update(ROOT_COMMANDS)
+            self.__switch_context(job, 'jobs')
             self.__cmd_output([])
 
     def __cmd_template(self, args):
