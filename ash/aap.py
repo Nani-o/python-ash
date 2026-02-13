@@ -101,7 +101,10 @@ class AAP(object):
         return self.api.retrieves_objects("job_templates", result_limit=0)
 
     def get_jobs(self, filters=None, result_limit=50):
-        return list(reversed(self.api.retrieves_objects("jobs", result_limit=result_limit, order_by="-finished", filters=filters)))
+        jobs = self.api.retrieves_objects("jobs", result_limit=result_limit, order_by="-finished", filters=filters)
+        if jobs:
+            jobs = list(reversed(jobs))
+        return jobs
 
     def get_job(self, job_id):
         response = self.api.get_request(f"jobs/{job_id}/")
