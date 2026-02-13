@@ -22,7 +22,7 @@ class API(object):
 
     def get_request(self, endpoint):
         try:
-            response = requests.get(self.url + endpoint, headers=self.headers, verify=False)
+            response = requests.get(self.url + endpoint, headers=self.headers, verify=False, timeout=10)
             return response
         except requests.exceptions.RequestException as e:
             print(colored(f"Error connecting to API: {e}", 'red'))
@@ -30,7 +30,7 @@ class API(object):
 
     def post_request(self, endpoint, payload):
         try:
-            response = requests.post(self.url + endpoint, headers=self.headers, json=payload, verify=False)
+            response = requests.post(self.url + endpoint, headers=self.headers, json=payload, verify=False, timeout=10)
             return response
         except requests.exceptions.RequestException as e:
             print(colored(f"Error connecting to API: {e}", 'red'))
