@@ -52,7 +52,6 @@ class API(object):
             for key, value in filters.items():
                 url += f"&{key}={value}"
 
-        print(url)
         response = self.get_request(url)
         if response is None or response.status_code != 200:
             print(colored(f"Error retrieving {object_type}: {response.status_code if response else 'No response'}", 'red'))
