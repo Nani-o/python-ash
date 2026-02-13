@@ -235,7 +235,7 @@ class Job(BaseObject):
                 print(stdout, end='')
                 if self.finished:
                     break
-                time.sleep(2)
+                time.sleep(5)
         else:
             stdout = self.get_stdout()
             if stdout is not None:
