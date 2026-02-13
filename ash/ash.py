@@ -329,7 +329,7 @@ class Ash(object):
             self.__cmd_output([])
 
     def __cmd_template(self, args):
-        self.__cd_job_template(str(self.current_context.job_template))
+        self.__cd_job_template([str(self.current_context.job_template)])
 
     def _load_cache(self, object_type):
         objects = self.cache.load_cache(object_type)
