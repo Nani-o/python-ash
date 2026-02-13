@@ -298,6 +298,8 @@ class Ash(object):
 
     def __cmd_refresh(self, args):
         self.current_context.refresh()
+        if self.current_context_type != 'jobs':
+            self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
         print("Context refreshed.")
 
     def __cmd_info(self, args):

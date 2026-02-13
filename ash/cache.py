@@ -27,7 +27,7 @@ class Cache(object):
 
     def insert_cache(self, table_name, id, data):
         data_pickled = pickle.dumps(data)
-        self.__execute_sql(f'''INSERT INTO {table_name} (id, data) VALUES(?, ?)''', (id, data_pickled))
+        self.__execute_sql(f'''INSERT OR REPLACE INTO {table_name} (id, data) VALUES(?, ?)''', (id, data_pickled))
 
     def load_cache(self, table_name):
         conn = sqlite3.connect(self.db_file)
