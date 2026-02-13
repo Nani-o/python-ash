@@ -10,4 +10,5 @@ COLORS = {
     'red':    '#ff0000',
     'green':  '#00ff00',
     'magenta':'#ff00ff',
+    'orange': '#ff8800',
 }
