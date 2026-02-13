@@ -17,7 +17,7 @@ class Cache(object):
 
     def _create_table(self, table_name):
         self.__execute_sql(f'''CREATE TABLE IF NOT EXISTS {table_name}
-                              (id integer primary key autoincrement,
+                              (id integer primary key,
                                data blob)''')
 
     def clean_cache(self):
@@ -25,9 +25,9 @@ class Cache(object):
         self.__execute_sql('DELETE FROM projects')
         self.__execute_sql('DELETE FROM inventories')
 
-    def insert_cache(self, table_name, data):
+    def insert_cache(self, table_name, id, data):
         data_pickled = pickle.dumps(data)
-        self.__execute_sql(f'''INSERT INTO {table_name} (data) VALUES(?)''', (data_pickled,))
+        self.__execute_sql(f'''INSERT INTO {table_name} (id, data) VALUES(?, ?)''', (id, data_pickled))
 
     def load_cache(self, table_name):
         conn = sqlite3.connect(self.db_file)
