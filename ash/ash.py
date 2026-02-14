@@ -356,6 +356,11 @@ class Ash(object):
                 user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
             payload[key] = user_input
 
+        user_input = self.session.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ")or "no"
+        if not user_input.lower() in ['yes', 'y']:
+            self.print("Job launch cancelled.", 'red_bold')
+            return
+
         job = self.current_context.launch(payload)
 
         if job:
