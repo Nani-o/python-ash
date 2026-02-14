@@ -50,13 +50,16 @@ class Ash(object):
                 if filter:
                     filter_key = filter[0]
                     filter_value = arg.split(':', 1)[1].strip()
+                    if not filter_value:
+                        self.print(f"Invalid filter format: '{arg}'. Expected format is 'filter:value'.", 'red')
+                        return []
                     objects = [
                         obj for obj in objects
                         if filter_value.lower()
                         in obj.data["summary_fields"].get(filter_key, {}).get('name', '').lower()
                         or filter_value.lower()
                         in obj.data["summary_fields"].get(filter_key, {}).get('username', '').lower()
-                        or filter_value.lower() in obj.data.get(filter_key, '').lower()
+                        or filter_value.lower() in str(obj.data.get(filter_key, '')).lower()
                     ]
                 else:
                     objects = [obj for obj in objects if arg in obj.name.lower()]
