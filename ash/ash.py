@@ -72,6 +72,18 @@ class Ash(object):
         else:
             print(message)
 
+    def object_to_color(self, obj):
+        if isinstance(obj, JobTemplate):
+            return 'cyan'
+        elif isinstance(obj, Inventory):
+            return 'green'
+        elif isinstance(obj, Project):
+            return 'orange'
+        elif isinstance(obj, Job):
+            return self.status_to_color(obj.status)
+        else:
+            return 'white'
+
     def status_to_color(self, status):
         if status == 'successful':
             return 'blue'
@@ -84,29 +96,47 @@ class Ash(object):
         else:
             return 'white'
 
-    def label_ellipsis(self, label, max_length):
+    def parse_label(self, label, max_length):
+        # if string is ISO datetime, parse and format it
+        try:
+            dt = dateutil.parser.isoparse(label)
+            label = dt.astimezone().strftime('%d/%m-%H:%M')
+        except (ValueError, TypeError):
+            pass
         if len(label) <= max_length:
             return label
         else:
             return label[:max_length-3] + '...'
 
     def display_jobs(self, jobs):
-        len_id = max([len(str(j.id)) for j in jobs] + [len("ID")])
-        len_name = max([len(j.name) for j in jobs] + [len("Name")])
-        len_scm_branch = max([len(j.scm_branch) for j in jobs] + [len("Branch")])
-        len_status = max([len(j.status) for j in jobs] + [len("Status")])
-        len_created = 11
-        len_playbook = max([len(j.playbook) for j in jobs] + [len("Playbook")])
-        len_limit = max([len(j.limit) for j in jobs] + [len("Limit")])
-        if len_limit > 25:
-            len_limit = 25
+        self.display_by_columns(jobs, ['id', 'created', 'limit', 'name', 'playbook', 'scm_branch', 'status'])
 
-        format_str = f"{{:<{len_id}}}   {{:<{len_created}}}   {{:<{len_limit}}}   {{:<{len_name}}}   {{:<{len_playbook}}}   {{:<{len_scm_branch}}}   {{:<{len_status}}}"
-        self.print(format_str.format("ID", "Created", "Limit", "Name", "Playbook", "Branch", "Status"), 'headers')
-        for job in jobs:
-            created = dateutil.parser.isoparse(job.created).astimezone().strftime('%d/%m-%H:%M')
-            message = format_str.format(job.id, created, self.label_ellipsis(job.limit, len_limit), job.name, job.playbook, job.scm_branch, job.status)
-            color = self.status_to_color(job.status)
+    def display_job_templates(self, job_templates):
+        self.display_by_columns(job_templates, ['id', 'name', 'playbook'])
+
+    def display_inventories(self, inventories):
+        self.display_by_columns(inventories, ['id', 'name', 'total_hosts'])
+
+    def display_projects(self, projects):
+        self.display_by_columns(projects, ['id', 'name', 'scm_url'])
+
+    def display_by_columns(self, objects, columns):
+        column_widths = {}
+        for col in columns:
+            if col in ['created', 'modified', 'finished']:
+                max_len = 11
+            else:
+                max_len = max([len(str(getattr(obj, col))) for obj in objects] + [len(col)])
+            if max_len > 30:
+                max_len = 30
+            column_widths[col] = max_len
+
+        format_str = "   ".join([f"{{:<{column_widths[col]}}}" for col in columns])
+        header = format_str.format(*[col.capitalize() for col in columns])
+        self.print(header, 'headers')
+        for obj in objects:
+            message = format_str.format(*[self.parse_label(str(getattr(obj, col)), column_widths[col]) for col in columns])
+            color = self.object_to_color(obj)
             self.print(message, color + '_bold')
 
     # List command implementations
@@ -130,9 +160,7 @@ class Ash(object):
             return
 
         job_templates = self.filter_objects(self.job_templates, args, LS_JOB_TEMPLATE_FILTERS)
-
-        for jt in job_templates:
-            self.print(f"JobTemplate[{jt.id}] - {jt.name} - {jt.playbook}", 'cyan')
+        self.display_job_templates(job_templates)
 
     def __ls_jobs(self, args):
         result_limit = 100
@@ -172,9 +200,7 @@ class Ash(object):
             return
 
         inventories = self.filter_objects(self.inventories, args, LS_INVENTORIES_FILTERS)
-
-        for inv in inventories:
-            self.print(f"Inventory[{inv.id}] - {inv.name} - {inv.total_hosts} hosts", 'green')
+        self.display_inventories(inventories)
 
     def __ls_projects(self, args):
         if not self.projects:
@@ -182,9 +208,7 @@ class Ash(object):
             return
 
         projects = self.filter_objects(self.projects, args, LS_PROJECTS_FILTERS)
-
-        for proj in projects:
-            self.print(f"Project[{proj.id}] - {proj.name} - {proj.scm_url}", 'orange')
+        self.display_projects(projects)
 
     # Change directory command implementations
     #
@@ -342,6 +366,10 @@ class Ash(object):
         output = self.current_context.print_stdout()
 
     def __cmd_launch(self, args):
+        if self.current_context.survey_enabled:
+            self.print("This job template has a survey. Not implemented yet.", 'red')
+            return
+
         payload = {}
 
         for var in self.current_context.get_asked_variables():
