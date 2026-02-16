@@ -127,7 +127,7 @@ class Ash(object):
                 max_len = 11
             else:
                 max_len = max([len(str(getattr(obj, col))) for obj in objects] + [len(col)])
-            if max_len > 30:
+            if col == 'limit' and max_len > 30:
                 max_len = 30
             column_widths[col] = max_len
 
