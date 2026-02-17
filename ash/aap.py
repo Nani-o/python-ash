@@ -209,6 +209,13 @@ class Project(BaseObject):
             return
         self.init_vars(response.json())
 
+    def sync(self):
+        response = self.api.post_request(f"projects/{self.id}/update/", {})
+        if response is None or response.status_code != 202:
+            print(colored(f"Error syncing project: {response.status_code if response else 'No response'}", 'red'))
+            return False
+        return True
+
 class Job(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)

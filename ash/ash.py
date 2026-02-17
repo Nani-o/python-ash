@@ -399,6 +399,14 @@ class Ash(object):
             self.__switch_context(job, 'jobs')
             self.__cmd_output([])
 
+    def __cmd_sync(self, args):
+        if self.current_context_type == 'job_templates':
+            project = self.projects_by_id.get(self.current_context.project)
+        else:
+            project = self.current_context
+        project.sync()
+        print(f"Project '{project.name}' sync initiated.")
+
     def __cmd_template(self, args):
         self.__cd_job_template([str(self.current_context.job_template)])
 

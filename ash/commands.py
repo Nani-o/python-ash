@@ -28,7 +28,8 @@ JT_COMMANDS = OrderedDict([
     ('refresh', 'job_template: Refresh the selected job template information'),
     ('info', 'job_template: Show information about the selected job template'),
     ('set', 'job_template: Set parameters for the selected job template'),
-    ('jobs', 'job_template: List jobs launched from the selected job template')
+    ('jobs', 'job_template: List jobs launched from the selected job template'),
+    ('sync', 'job_template: Sync the project associated with the selected job template')
 ])
 
 JOB_COMMANDS = OrderedDict([
