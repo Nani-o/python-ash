@@ -238,10 +238,11 @@ class Job(BaseObject):
             while True:
                 self.refresh()
                 stdout = self.get_stdout(start_line=start_line)
-                start_line += len(stdout.splitlines())
-                print(stdout, end='')
-                if self.finished:
-                    break
+                if stdout:
+                    start_line += len(stdout.splitlines())
+                    print(stdout, end='')
+                    if self.finished:
+                        break
                 time.sleep(5)
         else:
             stdout = self.get_stdout()
