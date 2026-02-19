@@ -8,3 +8,4 @@ wcwidth
 pyyaml
 python-dateutil
 jinja2
+termcolor
