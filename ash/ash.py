@@ -20,7 +20,7 @@ from .commands import ROOT_COMMANDS, CD_COMMANDS, LS_COMMANDS, LS_JOB_TEMPLATE_F
 from .colors import COLORS
 
 class Ash(object):
-    def __init__(self, baseurl, token, cache):
+    def __init__(self, config, cache):
         self.commands = ROOT_COMMANDS
         self.cd_commands = CD_COMMANDS
         self.ls_commands = LS_COMMANDS
@@ -31,7 +31,11 @@ class Ash(object):
             'inventories': LS_INVENTORIES_FILTERS
         }
         self.job_template_commands = JT_COMMANDS
-        self.api = API(baseurl, token)
+        if getattr(config, 'api_path', None):
+            api_path = config.api_path
+        else:
+            api_path = "/api/controller/v2/"
+        self.api = API(config.base_url, config.token, api_path=api_path)
         self.aap = AAP(self.api)
         self.cache = cache
         self._load_all_caches()

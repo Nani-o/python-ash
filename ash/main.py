@@ -12,7 +12,7 @@ def main():
     config = Config()
     cache = Cache()
 
-    ash = Ash(config.base_url, config.token, cache)
+    ash = Ash(config, cache)
     ash.run()
 
 if __name__ == '__main__':

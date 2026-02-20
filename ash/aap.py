@@ -8,10 +8,10 @@ from termcolor import colored
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class API(object):
-    def __init__(self, baseurl, token):
+    def __init__(self, baseurl, token, api_path="/api/v2/"):
         self.base_url = baseurl
         self.token = token
-        self.api_path = "/api/v2/"
+        self.api_path = api_path
         if not self.base_url.endswith('/'):
             self.base_url += '/'
         self.url = f"{self.base_url}{self.api_path}"

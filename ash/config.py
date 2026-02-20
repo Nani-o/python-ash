@@ -10,12 +10,14 @@ example :
 ---
 base_url: "https://your-aap-url.com"
 token: "your-token"
+api_path: "/api/controller/v2/"
 ...
 """
 
 CONFIGS = [
     'base_url',
-    'token'
+    'token',
+    'api_path'
 ]
 
 class Config(object):
