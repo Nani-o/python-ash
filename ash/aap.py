@@ -124,22 +124,24 @@ class BaseObject(object):
             setattr(self, k, v)
         self.data = data
 
-class JobTemplate(BaseObject):
-    def __init__(self, api, data):
-        super().__init__(api, data)
-
-    def __str__(self):
-        return f"JobTemplate(id={self.id}, name={self.name})"
-
     def refresh(self):
-        response = self.api.get_request(f"job_templates/{self.id}/")
+        response = self.api.get_request(self.uri)
 
         if response is None or response.status_code != 200:
             return
         self.__init__(self.api, response.json())
 
+class JobTemplate(BaseObject):
+    def __init__(self, api, data):
+        super().__init__(api, data)
+        self.uri = f"job_templates/{self.id}"
+        self.absolute_url = f"{self.api.base_url}#/templates/job_template/{self.id}"
+
+    def __str__(self):
+        return f"JobTemplate(id={self.id}, name={self.name})"
+
     def jobs(self):
-        jobs = self.api.retrieves_objects("jobs", baseuri=f"job_templates/{self.id}/jobs/", order_by="-finished", result_limit=50)
+        jobs = self.api.retrieves_objects("jobs", baseuri=f"{self.uri}/jobs/", order_by="-finished", result_limit=50)
         return jobs
 
     def get_asked_variables(self):
@@ -153,25 +155,20 @@ class JobTemplate(BaseObject):
         if payload is None:
             payload = {}
 
-        response = self.api.post_request(f"job_templates/{self.id}/launch/", payload)
+        response = self.api.post_request(f"{self.uri}/launch/", payload)
         return Job(self.api, response.json()) if response and response.status_code == 201 else None
 
 class Inventory(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
+        self.uri = f"inventories/{self.id}"
+        self.absolute_url = f"{self.api.base_url}#/inventories/inventory/{self.id}"
 
     def __str__(self):
         return f"Inventory(id={self.id}, name={self.name})"
 
-    def refresh(self):
-        response = self.api.get_request(f"inventories/{self.id}/")
-
-        if response is None or response.status_code != 200:
-            return
-        self.init_vars(response.json())
-
     def get_hosts(self):
-        response = self.api.get_request(f"inventories/{self.id}/hosts/")
+        response = self.api.get_request(f"{self.uri}/hosts/")
 
         if response is None or response.status_code != 200:
             return
@@ -184,33 +181,23 @@ class Inventory(BaseObject):
 class Host(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
+        self.uri = f"hosts/{self.id}"
+        self.absolute_url = f"{self.api.base_url}#/inventories/host/{self.id}"
 
     def __str__(self):
         return f"Host(id={self.id}, name={self.name})"
 
-    def refresh(self):
-        response = self.api.get_request(f"hosts/{self.id}/")
-
-        if response is None or response.status_code != 200:
-            return
-        self.init_vars(response.json())
-
 class Project(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
+        self.uri = f"projects/{self.id}"
+        self.absolute_url = f"{self.api.base_url}#/projects/project/{self.id}"
 
     def __str__(self):
         return f"Project(id={self.id}, name={self.name})"
 
-    def refresh(self):
-        response = self.api.get_request(f"projects/{self.id}/")
-
-        if response is None or response.status_code != 200:
-            return
-        self.init_vars(response.json())
-
     def sync(self):
-        response = self.api.post_request(f"projects/{self.id}/update/", {})
+        response = self.api.post_request(f"{self.uri}/update/", {})
         if response is None or response.status_code != 202:
             print(colored(f"Error syncing project: {response.status_code if response else 'No response'}", 'red'))
             return False
@@ -221,16 +208,11 @@ class Job(BaseObject):
         super().__init__(api, data)
         if not self.scm_branch:
             self.scm_branch = "main"
+        self.uri = f"jobs/{self.id}"
+        self.absolute_url = f"{self.api.base_url}#/jobs/job/{self.id}"
 
     def __str__(self):
         return f"Job(id={self.id}, name={self.name}, status={self.status})"
-
-    def refresh(self):
-        response = self.api.get_request(f"jobs/{self.id}/")
-
-        if response is None or response.status_code != 200:
-            return
-        self.init_vars(response.json())
 
     def print_stdout(self, follow=True):
         if follow:
@@ -250,7 +232,7 @@ class Job(BaseObject):
                 print(stdout)
 
     def get_stdout(self, start_line=0):
-        endpoint = f"jobs/{self.id}/stdout/?format=json&start_line={start_line}"
+        endpoint = f"{self.uri}/stdout/?format=json&start_line={start_line}"
 
         response = self.api.get_request(endpoint)
 

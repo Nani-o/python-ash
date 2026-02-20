@@ -26,6 +26,7 @@ LS_COMMANDS = OrderedDict([
 JT_COMMANDS = OrderedDict([
     ('launch', 'job_template: Launch the selected job template'),
     ('refresh', 'job_template: Refresh the selected job template information'),
+    ('open', 'job_template: Open the selected job template in your browser'),
     ('info', 'job_template: Show information about the selected job template'),
     ('set', 'job_template: Set parameters for the selected job template'),
     ('jobs', 'job_template: List jobs launched from the selected job template'),
@@ -35,6 +36,7 @@ JT_COMMANDS = OrderedDict([
 JOB_COMMANDS = OrderedDict([
     ('info', 'job: Show information about the selected job'),
     ('refresh', 'job: Refresh the selected job information'),
+    ('open', 'job: Open the selected job in your browser'),
     ('retry', 'job: Retry the selected job'),
     ('reuse', 'job: Reuse the selected job parameters as prefill for a new job'),
     ('template', 'job: Switch context to the job template of the selected job'),
@@ -45,6 +47,7 @@ JOB_COMMANDS = OrderedDict([
 INVENTORY_COMMANDS = OrderedDict([
     ('info', 'inventory: Show information about the selected inventory'),
     ('refresh', 'inventory: Refresh the selected inventory'),
+    ('open', 'inventory: Open the selected inventory in your browser'),
     ('hosts', 'inventory: List hosts in the selected inventory'),
     ('groups', 'inventory: List groups in the selected inventory')
 ])
@@ -52,6 +55,7 @@ INVENTORY_COMMANDS = OrderedDict([
 PROJECT_COMMANDS = OrderedDict([
     ('info', 'project: Show information about the selected project'),
     ('refresh', 'project: Refresh the selected project information'),
+    ('open', 'project: Open the selected project in your browser'),
     ('sync', 'project: Sync the selected project')
 ])
 

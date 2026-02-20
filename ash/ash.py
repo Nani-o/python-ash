@@ -10,6 +10,7 @@ from prompt_toolkit.styles import Style
 from os.path import expanduser
 
 import json
+import webbrowser
 import dateutil.parser
 from jinja2 import Environment, FileSystemLoader
 
@@ -343,6 +344,14 @@ class Ash(object):
         if self.current_context_type != 'jobs':
             self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
         print("Context refreshed.")
+
+    def __cmd_open(self, args):
+        url = self.current_context.absolute_url
+        if url:
+            webbrowser.open(url)
+            print(f"Opened {url} in your browser.")
+        else:
+            print("Unable to get URL for the current context.", 'red')
 
     def __cmd_info(self, args):
         print(json.dumps(self.current_context.data, indent=4))
