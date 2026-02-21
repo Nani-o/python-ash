@@ -151,6 +151,15 @@ class JobTemplate(BaseObject):
                 asked_vars.append(attr[4:].replace('_on_launch', ''))
         return asked_vars
 
+    def get_survey_spec(self):
+        if not self.survey_enabled:
+            return []
+        response = self.api.get_request(f"{self.uri}/survey_spec/")
+        if response is None or response.status_code != 200:
+            return []
+        survey_spec = response.json()
+        return survey_spec.get('spec', [])
+
     def launch(self, payload=None):
         if payload is None:
             payload = {}

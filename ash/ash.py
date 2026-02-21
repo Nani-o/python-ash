@@ -8,6 +8,7 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.styles import Style
 from os.path import expanduser
+from iterfzf import iterfzf
 
 import json
 import webbrowser
@@ -46,7 +47,7 @@ class Ash(object):
         self.history = FileHistory(history_file_path)
         self.completer = AshCompleter(self)
         self.style = Style.from_dict(self.colors)
-        self.session = PromptSession(history=self.history, completer=self.completer, style=self.style)
+        self.session = PromptSession(history=self.history, style=self.style)
 
     def filter_objects(self, objects, args, filter_definitions):
         if args:
@@ -378,11 +379,56 @@ class Ash(object):
     def __cmd_output(self, args):
         output = self.current_context.print_stdout()
 
-    def __cmd_launch(self, args):
-        if self.current_context.survey_enabled:
-            self.print("This job template has a survey. Not implemented yet.", 'red')
-            return
+    def __multiple_choice_prompt(self, name, description, variable, choices, default=None, required=False, multi=False):
+        options = {"--layout=reverse"}
+        height = len(choices) + 2
+        user_input = None
+        if multi:
+            options.add(f"--header=Select one or more options using tab/shift+tab and press Enter when done.")
+            height += 1
+        options.add(f"--height={height}")
+        if required and not default:
+            while not user_input:
+                user_input = iterfzf(choices, prompt=f"{name} ({description}) [required]: ", __extra__=options, multi=multi)
+        else:
+            # Reorder the list so that the default value(s) appear at the top
+            if default and not multi:
+                choices = sorted(choices, key=lambda x: 0 if x == default else 1)
+            user_input = iterfzf(choices, prompt=f"{name} ({description}) [{default}]: ", __extra__=options, multi=multi) or default
+        print(f"Set variable '{variable}' to '{user_input}'")
+        return user_input
 
+    def __handle_survey(self, survey_spec):
+        extra_vars = {}
+        for question in survey_spec:
+            default = question.get('default', '')
+            name = question['question_name']
+            description = question['question_description']
+            variable = question['variable']
+            required = question['required']
+            type = question['type']
+
+            user_input = None
+            if type == 'text':
+                if required and not default:
+                    while not user_input:
+                        user_input = self.session.prompt(f"{name} ({description}) [required]: ")
+                else:
+                    user_input = self.session.prompt(f"{name} ({description}) [{default}]: ") or default
+                print(f"Set variable '{variable}' to '{user_input}'")
+            elif type == 'multiplechoice':
+                choices = question.get('choices', [])
+                user_input = self.__multiple_choice_prompt(name, description, variable, choices, default=default, required=required)
+            elif type == 'multiselect':
+                choices = question.get('choices', [])
+                user_input = self.__multiple_choice_prompt(name, description, variable, choices, default=default, required=required, multi=True)
+
+            extra_vars[variable] = user_input
+
+        return extra_vars
+
+
+    def __cmd_launch(self, args):
         payload = {}
 
         for var in self.current_context.get_asked_variables():
@@ -399,6 +445,16 @@ class Ash(object):
             if var == "credential" and isinstance(user_input, str):
                 user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
             payload[key] = user_input
+
+        if self.current_context.survey_enabled:
+            self.print("This job template has a survey. Not implemented yet.", 'red')
+            extra_vars = self.__handle_survey(self.current_context.get_survey_spec())
+            print(f"Extra vars from survey: {extra_vars}")
+
+            if 'extra_vars' in payload and isinstance(payload['extra_vars'], dict):
+                payload['extra_vars'] = {**payload['extra_vars'], **extra_vars}
+            elif extra_vars:
+                payload['extra_vars'] = extra_vars
 
         user_input = self.session.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ")or "no"
         if not user_input.lower() in ['yes', 'y']:
@@ -472,7 +528,7 @@ class Ash(object):
     def run(self):
         while True:
             try:
-                text = self.session.prompt(self.get_prompt())
+                text = self.session.prompt(self.get_prompt(), completer=self.completer)
                 # text = self.session.prompt(self.get_prompt(), refresh_interval=0.5, reserve_space_for_menu=0)
             except KeyboardInterrupt:
                 continue  # Control-C pressed. Try again.

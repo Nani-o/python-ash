@@ -9,3 +9,4 @@ pyyaml
 python-dateutil
 jinja2
 termcolor
+iterfzf
