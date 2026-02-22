@@ -13,7 +13,6 @@ from iterfzf import iterfzf
 import json
 import webbrowser
 import dateutil.parser
-from jinja2 import Environment, FileSystemLoader
 
 from .aap import AAP, API, Inventory, JobTemplate, Project, Job
 from .completer import AshCompleter
