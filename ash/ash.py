@@ -48,6 +48,7 @@ class Ash(object):
         self.completer = AshCompleter(self)
         self.style = Style.from_dict(self.colors)
         self.session = PromptSession(history=self.history, style=self.style)
+        self.session_wo_history = PromptSession(style=self.style)
 
     def filter_objects(self, objects, args, filter_definitions):
         if args:
@@ -438,9 +439,9 @@ class Ash(object):
             if type == 'text':
                 if required and not default:
                     while not user_input:
-                        user_input = self.session.prompt(f"{name} ({description}) [required]: ")
+                        user_input = self.session_wo_history.prompt(f"{name} ({description}) [required]: ", multiline=False)
                 else:
-                    user_input = self.session.prompt(f"{name} ({description}) [{default}]: ") or default
+                    user_input = self.session_wo_history.prompt(f"{name} ({description}) [{default}]: ", multiline=False) or default
                 print(f"Set variable '{variable}' to '{user_input}'")
             elif type == 'multiplechoice':
                 choices = question.get('choices', [])
@@ -467,13 +468,12 @@ class Ash(object):
                 default = [cred['id'] for cred in credentials]
                 default_display = ",".join([f"{cred['id']}:{cred['name']}" for cred in credentials])
 
-            user_input = self.session.prompt(f"{var} [{default_display}]: ") or default
+            user_input = self.session_wo_history.prompt(f"{var} [{default_display}]: ", multiline=False) or default
             if var == "credential" and isinstance(user_input, str):
                 user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
             payload[key] = user_input
 
         if self.current_context.survey_enabled:
-            self.print("This job template has a survey. Not implemented yet.", 'red')
             extra_vars = self.__handle_survey(self.current_context.get_survey_spec())
             print(f"Extra vars from survey: {extra_vars}")
 
@@ -482,7 +482,7 @@ class Ash(object):
             elif extra_vars:
                 payload['extra_vars'] = extra_vars
 
-        user_input = self.session.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ")or "no"
+        user_input = self.session_wo_history.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ", multiline=False)or "no"
         if not user_input.lower() in ['yes', 'y']:
             self.print("Job launch cancelled.", 'red_bold')
             return
@@ -558,7 +558,7 @@ class Ash(object):
     def run(self):
         while True:
             try:
-                text = self.session.prompt(self.get_prompt(), completer=self.completer)
+                text = self.session.prompt(self.get_prompt(), completer=self.completer, multiline=False)
                 # text = self.session.prompt(self.get_prompt(), refresh_interval=0.5, reserve_space_for_menu=0)
             except KeyboardInterrupt:
                 continue  # Control-C pressed. Try again.
