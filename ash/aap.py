@@ -1,13 +1,18 @@
 #!/usr/bin/env python
 
-import requests
-import json
-import urllib3
+"""Module for interacting with Ansible Automation Platform (AAP) API."""
+
+# pylint: disable=no-member, access-member-before-definition, missing-class-docstring, missing-function-docstring
+
 import time
+
+import requests
 from termcolor import colored
+
+import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-class API(object):
+class API():
     def __init__(self, baseurl, token, api_path="/api/v2/"):
         self.base_url = baseurl
         self.token = token
@@ -22,7 +27,8 @@ class API(object):
 
     def get_request(self, endpoint):
         try:
-            response = requests.get(self.url + endpoint, headers=self.headers, verify=False, timeout=10)
+            response = requests.get(self.url + endpoint, headers=self.headers,
+                                    verify=False, timeout=10)
             return response
         except requests.exceptions.RequestException as e:
             print(colored(f"Error connecting to API: {e}", 'red'))
@@ -30,13 +36,15 @@ class API(object):
 
     def post_request(self, endpoint, payload):
         try:
-            response = requests.post(self.url + endpoint, headers=self.headers, json=payload, verify=False, timeout=10)
+            response = requests.post(self.url + endpoint, headers=self.headers,
+                                     json=payload, verify=False, timeout=10)
             return response
         except requests.exceptions.RequestException as e:
             print(colored(f"Error connecting to API: {e}", 'red'))
             return None
 
-    def retrieves_objects(self, object_type, result_limit=10, order_by=None, baseuri=None, filters=None):
+    def retrieves_objects(self, object_type, result_limit=10, order_by=None,
+                          baseuri=None, filters=None):
         if not result_limit or result_limit > 100:
             page_size = 100
         else:
@@ -56,7 +64,7 @@ class API(object):
         response = self.get_request(url)
         if response is None or response.status_code != 200:
             self.log_error(response)
-            return
+            return None
         data = response.json().get('results', [])
 
         if not result_limit:
@@ -67,7 +75,7 @@ class API(object):
             response = self.get_request(endpoint)
             if response is None or response.status_code != 200:
                 self.log_error(response)
-                return
+                return None
             for item in response.json().get('results', []):
                 if len(data) < result_limit:
                     data.append(item)
@@ -78,16 +86,16 @@ class API(object):
     def instantiate_object(self, object_type, data):
         if object_type == "inventories":
             return Inventory(self, data)
-        elif object_type == "projects":
+        if object_type == "projects":
             return Project(self, data)
-        elif object_type == "job_templates":
+        if object_type == "job_templates":
             return JobTemplate(self, data)
-        elif object_type == "jobs":
+        if object_type == "jobs":
             return Job(self, data)
-        else:
-            return None
 
-class AAP(object):
+        return None
+
+class AAP():
     def __init__(self, api):
         self.api = api
 
@@ -101,7 +109,8 @@ class AAP(object):
         return self.api.retrieves_objects("job_templates", result_limit=0)
 
     def get_jobs(self, filters=None, result_limit=50):
-        jobs = self.api.retrieves_objects("jobs", result_limit=result_limit, order_by="-finished", filters=filters)
+        jobs = self.api.retrieves_objects("jobs", result_limit=result_limit,
+                                          order_by="-finished", filters=filters)
         if jobs:
             jobs = list(reversed(jobs))
         return jobs
@@ -110,11 +119,12 @@ class AAP(object):
         response = self.api.get_request(f"jobs/{job_id}/")
 
         if response is None or response.status_code != 200:
-            return
+            self.log_error(response)
+            return None
 
         return Job(self.api, response.json())
 
-class BaseObject(object):
+class BaseObject():
     def __init__(self, api, data):
         self.api = api
         self.init_vars(data)
@@ -129,7 +139,7 @@ class BaseObject(object):
 
         if response is None or response.status_code != 200:
             return
-        self.__init__(self.api, response.json())
+        self.init_vars(response.json())
 
     def log_error(self, response):
         if response is None:
@@ -147,7 +157,8 @@ class JobTemplate(BaseObject):
         return f"JobTemplate(id={self.id}, name={self.name})"
 
     def jobs(self):
-        jobs = self.api.retrieves_objects("jobs", baseuri=f"{self.uri}/jobs/", order_by="-finished", result_limit=50)
+        jobs = self.api.retrieves_objects("jobs", baseuri=f"{self.uri}/jobs/",
+                                          order_by="-finished", result_limit=50)
         return jobs
 
     def get_asked_variables(self):
@@ -186,7 +197,8 @@ class Inventory(BaseObject):
         response = self.api.get_request(f"{self.uri}/hosts/")
 
         if response is None or response.status_code != 200:
-            return
+            self.log_error(response)
+            return []
 
         hosts = []
         for item in response.json().get('results', []):
@@ -252,7 +264,7 @@ class Job(BaseObject):
         response = self.api.get_request(endpoint)
 
         if response is None or response.status_code != 200:
-            return
+            return None
 
         return response.json().get('content', '')
 
