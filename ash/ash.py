@@ -340,8 +340,16 @@ class Ash(object):
     #
 
     def __cmd_cache(self, args):
-        self.cache.clean_cache()
-        self._load_all_caches()
+        if args:
+            if args[0] not in ['inventories', 'projects', 'job_templates']:
+                print(f"Unknown cache type: {args[0]}. Valid types are: inventories, projects, job_templates.")
+                return
+            self.cache.clean_cache(args[0])
+            method = getattr(self, f'_load_{args[0]}_cache', None)
+            method()
+        else:
+            self.cache.clean_cache()
+            self._load_all_caches()
         print("Cache refreshed.")
 
     def __cmd_refresh(self, args):
@@ -497,11 +505,10 @@ class Ash(object):
     def __cmd_template(self, args):
         self.__cd_job_template([str(self.current_context.job_template)])
 
-    def _load_cache(self, object_type):
+    def _get_objects(self, object_type):
         objects = self.cache.load_cache(object_type)
         if objects:
             print(f"Loaded {object_type} from cache, use 'cache' command to refresh.")
-            return objects
         else:
             print(f"Retrieving and caching {object_type}")
             method = getattr(self.aap, f'get_{object_type}')
@@ -511,20 +518,25 @@ class Ash(object):
             for obj in objects:
                 self.cache.insert_cache(object_type, obj.id, obj)
             print(f"{len(objects)} {object_type} cached.")
-            return objects
+
+        objects_by_id = {obj.id: obj for obj in objects}
+        objects_by_name = {obj.name: obj for obj in objects}
+
+        return objects, objects_by_id, objects_by_name
+
+    def _load_inventories_cache(self):
+        self.inventories, self.inventories_by_id, self.inventories_by_name = self._get_objects('inventories')
+
+    def _load_job_templates_cache(self):
+        self.job_templates, self.job_templates_by_id, self.job_templates_by_name = self._get_objects('job_templates')
+
+    def _load_projects_cache(self):
+        self.projects, self.projects_by_id, self.projects_by_name = self._get_objects('projects')
 
     def _load_all_caches(self):
-        self.inventories = self._load_cache('inventories')
-        self.inventories_by_id = {inv.id: inv for inv in self.inventories} if self.inventories else {}
-        self.inventories_by_name = {inv.name: inv for inv in self.inventories} if self.inventories else {}
-
-        self.projects = self._load_cache('projects')
-        self.projects_by_id = {proj.id: proj for proj in self.projects} if self.projects else {}
-        self.projects_by_name = {proj.name: proj for proj in self.projects} if self.projects else {}
-
-        self.job_templates = self._load_cache('job_templates')
-        self.job_templates_by_id = {jt.id: jt for jt in self.job_templates} if self.job_templates else {}
-        self.job_templates_by_name = {jt.name: jt for jt in self.job_templates} if self.job_templates else {}
+        self._load_inventories_cache()
+        self._load_job_templates_cache()
+        self._load_projects_cache()
 
     def get_prompt(self):
         prompt = []

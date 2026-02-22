@@ -20,10 +20,18 @@ class Cache(object):
                               (id integer primary key,
                                data blob)''')
 
-    def clean_cache(self):
-        self.__execute_sql('DELETE FROM job_templates')
-        self.__execute_sql('DELETE FROM projects')
-        self.__execute_sql('DELETE FROM inventories')
+    def clean_cache(self, args=None):
+        if args:
+            if args == "job_templates":
+                self.__execute_sql('DELETE FROM job_templates')
+            elif args == "projects":
+                self.__execute_sql('DELETE FROM projects')
+            elif args == "inventories":
+                self.__execute_sql('DELETE FROM inventories')
+        else:
+            self.__execute_sql('DELETE FROM job_templates')
+            self.__execute_sql('DELETE FROM projects')
+            self.__execute_sql('DELETE FROM inventories')
 
     def insert_cache(self, table_name, id, data):
         data_pickled = pickle.dumps(data)
