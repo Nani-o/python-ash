@@ -55,7 +55,7 @@ class API(object):
 
         response = self.get_request(url)
         if response is None or response.status_code != 200:
-            print(colored(f"Error retrieving {object_type}: {response.status_code if response else 'No response'}", 'red'))
+            self.log_error(response)
             return
         data = response.json().get('results', [])
 
@@ -66,7 +66,7 @@ class API(object):
             endpoint = response.json().get('next').replace(self.api_path, '')
             response = self.get_request(endpoint)
             if response is None or response.status_code != 200:
-                print(colored(f"Error retrieving {object_type}: {response.status_code if response else 'No response'}", 'red'))
+                self.log_error(response)
                 return
             for item in response.json().get('results', []):
                 if len(data) < result_limit:
@@ -130,6 +130,12 @@ class BaseObject(object):
         if response is None or response.status_code != 200:
             return
         self.__init__(self.api, response.json())
+
+    def log_error(self, response):
+        if response is None:
+            print(colored("Error: No response from API", 'red'))
+        else:
+            print(colored(f"Error: {response.status_code} - {response.text}", 'red'))
 
 class JobTemplate(BaseObject):
     def __init__(self, api, data):
@@ -208,7 +214,7 @@ class Project(BaseObject):
     def sync(self):
         response = self.api.post_request(f"{self.uri}/update/", {})
         if response is None or response.status_code != 202:
-            print(colored(f"Error syncing project: {response.status_code if response else 'No response'}", 'red'))
+            self.log_error(response)
             return False
         return True
 
@@ -257,6 +263,6 @@ class Job(BaseObject):
     def cancel(self):
         response = self.api.post_request(f"{self.uri}/cancel/", {})
         if response is None or response.status_code != 202:
-            print(colored(f"Error cancelling job: {response.status_code if response else 'No response'}", 'red'))
+            self.log_error(response)
             return False
         return True
