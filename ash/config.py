@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
+"""Module providing a Config class for managing Ash configuration settings"""
+
+# pylint: disable=too-few-public-methods
+
 import os
-import yaml
 import sys
 from pathlib import Path
 
-config_example = """
+import yaml
+
+CONFIG_EXAMPLE = """
 example :
 ---
 base_url: "https://your-aap-url.com"
@@ -20,7 +25,11 @@ CONFIGS = [
     'api_path'
 ]
 
-class Config(object):
+class Config():
+    """Class for managing Ash configuration settings.
+       Loads configuration from a YAML file and provides
+       access to the settings as attributes."""
+
     def __init__(self):
         self.data_folder = Path.home().joinpath(".local", "share", "ash")
         config = self.__load_config()
@@ -37,10 +46,10 @@ class Config(object):
             self.data_folder.mkdir(parents=True, exist_ok=True)
         config_file = self.data_folder.joinpath('config.yml')
         if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
+            with open(config_file, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
             return config
-        else:
-            print("You must create a config file " + str(config_file))
-            print(config_example)
-            sys.exit(1)
+
+        print("You must create a config file " + str(config_file))
+        print(CONFIG_EXAMPLE)
+        sys.exit(1)
