@@ -376,6 +376,24 @@ class Ash(object):
         else:
             print("No hosts found in this inventory.")
 
+    def __cmd_relaunch(self, args):
+        job = self.current_context.relaunch()
+        if job:
+            self.print(f"Relaunched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
+            self.__switch_context(job, 'jobs')
+            self.__cmd_output([])
+        else:
+            self.print("Failed to relaunch the job.", 'red')
+
+    def __cmd_cancel(self, args):
+        if self.current_context.cancel():
+            self.print(f"Cancelled job with ID: {self.current_context.id}", 'yellow')
+        else:
+            self.print("Failed to cancel the job.", 'red')
+
+    def __cmd_reuse(self, args):
+        self.print("Not implemented yet.", 'red')
+
     def __cmd_output(self, args):
         output = self.current_context.print_stdout()
 

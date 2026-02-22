@@ -249,3 +249,14 @@ class Job(BaseObject):
             return
 
         return response.json().get('content', '')
+
+    def relaunch(self):
+        response = self.api.post_request(f"{self.uri}/relaunch/", {})
+        return Job(self.api, response.json()) if response and response.status_code == 201 else None
+
+    def cancel(self):
+        response = self.api.post_request(f"{self.uri}/cancel/", {})
+        if response is None or response.status_code != 202:
+            print(colored(f"Error cancelling job: {response.status_code if response else 'No response'}", 'red'))
+            return False
+        return True
