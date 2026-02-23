@@ -558,7 +558,7 @@ class Ash(object):
             method = getattr(self.aap, f'get_{object_type}')
             objects = method()
             if not objects:
-                return []
+                return [], [], []
             for obj in objects:
                 self.cache.insert_cache(object_type, obj.id, obj)
             print(f"{len(objects)} {object_type} cached.")

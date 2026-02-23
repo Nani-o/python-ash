@@ -95,6 +95,13 @@ class API():
 
         return None
 
+    def log_error(self, response):
+        if response is None:
+            print(colored("Error: No response from API", 'red'))
+        else:
+            print(colored(f"Error: {response.status_code} - {response.text}", 'red'))
+
+
 class AAP():
     def __init__(self, api):
         self.api = api
