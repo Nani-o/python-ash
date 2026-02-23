@@ -14,7 +14,7 @@ if [[ "$CURRENT_BRANCH" == "main" ]]; then
         TAG_MESSAGE=$(git log $LAST_TAG..$CURRENT_COMMIT --pretty=format:"%s")
 
         if [[ -n "$VERSION_NUMBER" ]]; then
-            git tag "$VERSION_NUMBER" -m "$TAG_MESSAGE"
+            git tag -s "$VERSION_NUMBER" -m "$TAG_MESSAGE"
             echo "Tagged with version $VERSION_NUMBER"
         else
             echo "No version number found in $FILE_TO_WATCH"
