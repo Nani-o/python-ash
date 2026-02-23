@@ -11,6 +11,7 @@ from os.path import expanduser
 from iterfzf import iterfzf
 
 import json
+import re
 import yaml
 import webbrowser
 import dateutil.parser
@@ -105,11 +106,12 @@ class Ash(object):
 
     def parse_label(self, label, max_length):
         # if string is ISO datetime, parse and format it
-        try:
-            dt = dateutil.parser.isoparse(label)
-            label = dt.astimezone().strftime('%d/%m-%H:%M')
-        except (ValueError, TypeError):
-            pass
+        if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?", label):
+           try:
+                dt = dateutil.parser.isoparse(label)
+                label = dt.astimezone().strftime('%d/%m-%H:%M')
+           except (ValueError, TypeError):
+                pass
         if len(label) <= max_length:
             return label
         else:
