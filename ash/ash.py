@@ -141,7 +141,7 @@ class Ash(object):
             column_widths[col] = max_len
 
         format_str = "   ".join([f"{{:<{column_widths[col]}}}" for col in columns])
-        header = format_str.format(*[col.capitalize() for col in columns])
+        header = format_str.format(*[col for col in columns])
         self.print(header, 'headers')
         for obj in objects:
             message = format_str.format(*[self.parse_label(str(getattr(obj, col)), column_widths[col]) for col in columns])
