@@ -11,6 +11,7 @@ from os.path import expanduser
 from iterfzf import iterfzf
 
 import json
+import yaml
 import webbrowser
 import dateutil.parser
 
@@ -458,19 +459,35 @@ class Ash(object):
         payload = {}
 
         for var in self.current_context.get_asked_variables():
-            key = var
-            default = getattr(self.current_context, var, '')
-            default_display = default
-            if var == "credential":
-                key = "credentials"
+            multiline = False
+            if var == "variables":
+                var = "extra_vars"
+                multiline = True
+                default = getattr(self.current_context, var, '')
+                default_display = ''
+            elif var == "credential":
+                var = "credentials"
                 credentials = self.current_context.summary_fields.get('credentials', [])
                 default = [cred['id'] for cred in credentials]
                 default_display = ",".join([f"{cred['id']}:{cred['name']}" for cred in credentials])
+            elif var == "inventory":
+                inventory = self.current_context.summary_fields.get('inventory', {})
+                default = inventory.get('id')
+                default_display = f"{default}:{inventory.get('name', '')}"
+            else:
+                default = getattr(self.current_context, var, '')
+                default_display = default
 
-            user_input = self.session_wo_history.prompt(f"{var} [{default_display}]: ", multiline=False) or default
+            user_input = self.session_wo_history.prompt(f"{var} [{default_display}]: ", multiline=multiline, default=str(default)) or default
             if var == "credential" and isinstance(user_input, str):
                 user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
-            payload[key] = user_input
+            if var == "extra_vars":
+                try:
+                    user_input = yaml.safe_load(user_input) if user_input else {}
+                except yaml.YAMLError as e:
+                    self.print(f"Error parsing YAML: {e}", 'red')
+                    return
+            payload[var] = user_input
 
         if self.current_context.survey_enabled:
             extra_vars = self.__handle_survey(self.current_context.get_survey_spec())
@@ -480,7 +497,7 @@ class Ash(object):
                 payload['extra_vars'] = {**payload['extra_vars'], **extra_vars}
             elif extra_vars:
                 payload['extra_vars'] = extra_vars
-
+        print(payload['extra_vars'])
         user_input = self.session_wo_history.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ", multiline=False)or "no"
         if not user_input.lower() in ['yes', 'y']:
             self.print("Job launch cancelled.", 'red_bold')
