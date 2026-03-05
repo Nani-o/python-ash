@@ -104,7 +104,7 @@ class Ash(object):
         else:
             return 'white'
 
-    def parse_label(self, label, max_length):
+    def parse_label(self, label, max_length=None):
         # if string is ISO datetime, parse and format it
         if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?", label):
            try:
@@ -112,7 +112,7 @@ class Ash(object):
                 label = dt.astimezone().strftime('%d/%m-%H:%M')
            except (ValueError, TypeError):
                 pass
-        if len(label) <= max_length:
+        if max_length is None or len(label) <= max_length:
             return label
         else:
             return label[:max_length-3] + '...'
@@ -266,9 +266,7 @@ class Ash(object):
         if identifier.isdigit():
             jt = self.job_templates_by_id.get(int(identifier))
         else:
-            matches = [jt for name, jt in self.job_templates_by_name.items() if identifier.lower() in name.lower()]
-            if len(matches) == 1:
-                jt = matches[0]
+            jt = self.__find_matching_objects(self.job_templates, identifier)
 
         if not jt:
             self.print(f"Job Template '{identifier}' not found.", 'red')
@@ -282,11 +280,13 @@ class Ash(object):
         if identifier.isdigit():
             job = self.aap.get_job(int(identifier))
         else:
-            jobs = self.aap.get_jobs()
-            matches = [j for j in jobs if identifier.lower() in j.name.lower()]
-            if len(matches) == 1:
-                job = matches[0]
-
+            jobs = list(reversed(self.aap.get_jobs(filters={'search': identifier}, result_limit=10)))
+            if jobs:
+                jobs_list = ["{}: {} - {:<15} {} {}".format(job.id, job.name, self.parse_label(job.limit, 15), job.status, self.parse_label(job.created)) for job in jobs]
+                job = self.__multiple_choice_prompt("Job", f"Multiple jobs found matching '{identifier}'. Please select one:", jobs_list, required=True)
+                if job:
+                    job_id = int(job.split(':', 1)[0])
+                    job = next((j for j in jobs if j.id == job_id), None)
         if not job:
             self.print(f"Job '{identifier}' not found.", 'red')
             return
@@ -299,9 +299,7 @@ class Ash(object):
         if identifier.isdigit():
             inv = self.inventories_by_id.get(int(identifier))
         else:
-            matches = [inv for name, inv in self.inventories_by_name.items() if identifier.lower() in name.lower()]
-            if len(matches) == 1:
-                inv = matches[0]
+            inv = self.__find_matching_objects(self.inventories, identifier)
 
         if not inv:
             self.print(f"Inventory '{identifier}' not found.", 'red')
@@ -315,25 +313,27 @@ class Ash(object):
         if identifier.isdigit():
             proj = self.projects_by_id.get(int(identifier))
         else:
-            matches = [proj for name, proj in self.projects_by_name.items() if identifier.lower() in name.lower()]
-            if len(matches) == 1:
-                proj = matches[0]
-            elif len(matches) > 1:
-                for p in matches:
-                    if identifier.lower() == p.name.lower():
-                        proj = p
-                        break
-                if not proj:
-                    self.print(f"Multiple projects found matching '{identifier}':", 'red')
-                    for p in matches:
-                        self.print(f"ID={p.id}, Name={p.name}", 'red')
-                    return
+            proj = self.__find_matching_objects(self.projects, identifier)
 
         if not proj:
             self.print(f"Project '{identifier}' not found.", 'red')
             return
         self.print(f"Switched context to Project: ID={proj.id}, Name={proj.name}", 'orange')
         self.__switch_context(proj, 'projects')
+
+    def __find_matching_objects(self, objects, identifier):
+        matches = [obj for obj in objects if identifier.lower() in obj.name.lower()]
+        exact_matches = [obj for obj in matches if identifier.lower() == obj.name.lower()]
+        if len(exact_matches) == 1:
+            return exact_matches[0]
+        elif len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            user_input = self.__multiple_choice_prompt("Multiple matches found", f"Multiple objects found matching '{identifier}'. Please select one:", [f"{obj.id}: {obj.name}" for obj in matches], required=True)
+            if user_input:
+                selected_id = int(user_input.split(':', 1)[0])
+                return next((obj for obj in matches if obj.id == selected_id), None)
+        return None
 
     # Refresh commands implementation
     #
@@ -408,7 +408,7 @@ class Ash(object):
     def __cmd_output(self, args):
         output = self.current_context.print_stdout()
 
-    def __multiple_choice_prompt(self, name, description, variable, choices, default=None, required=False, multi=False):
+    def __multiple_choice_prompt(self, name, description, choices, default=None, required=False, multi=False):
         options = {"--layout=reverse"}
         height = len(choices) + 2
         user_input = None
@@ -424,7 +424,6 @@ class Ash(object):
             if default and not multi:
                 choices = sorted(choices, key=lambda x: 0 if x == default else 1)
             user_input = iterfzf(choices, prompt=f"{name} ({description}) [{default}]: ", __extra__=options, multi=multi) or default
-        print(f"Set variable '{variable}' to '{user_input}'")
         return user_input
 
     def __handle_survey(self, survey_spec):
@@ -447,11 +446,12 @@ class Ash(object):
                 print(f"Set variable '{variable}' to '{user_input}'")
             elif type == 'multiplechoice':
                 choices = question.get('choices', [])
-                user_input = self.__multiple_choice_prompt(name, description, variable, choices, default=default, required=required)
+                user_input = self.__multiple_choice_prompt(name, description, choices, default=default, required=required)
             elif type == 'multiselect':
                 choices = question.get('choices', [])
-                user_input = self.__multiple_choice_prompt(name, description, variable, choices, default=default, required=required, multi=True)
+                user_input = self.__multiple_choice_prompt(name, description, choices, default=default, required=required, multi=True)
 
+            print(f"Set variable '{variable}' to '{user_input}'")
             extra_vars[variable] = user_input
 
         return extra_vars
