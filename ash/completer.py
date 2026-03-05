@@ -78,6 +78,11 @@ class AshCompleter(Completer):
                     self.cur_word,
                     ['inventories', 'job_templates', 'projects']
                 )
+            elif command == "info":
+                self.completions = self._match_input(
+                    self.cur_word,
+                    list(self.ash.current_context.data.keys())
+                )
 
         if isinstance(self.completions, list):
             self.completions.sort()
