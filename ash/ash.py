@@ -370,7 +370,13 @@ class Ash(object):
             print("Unable to get URL for the current context.", 'red')
 
     def __cmd_info(self, args):
-        print(json.dumps(self.current_context.data, indent=4))
+        info = {}
+        if args:
+            for arg in args:
+                info[arg] = self.current_context.data.get(arg, None)
+        else:
+            info = self.current_context.data
+        print(json.dumps(info, indent=4))
 
     def __cmd_jobs(self, args):
         jobs = self.current_context.jobs()
