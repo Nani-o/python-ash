@@ -94,3 +94,34 @@ class AshCompleter(Completer):
                 meta = None
 
             yield Completion(word, -len(self.cur_word), display_meta=meta)
+
+class FormCompleter(Completer):
+    def __init__(self, ash_instance):
+        self.ash = ash_instance
+
+    def _match_input(self, input, struct):
+        if isinstance(struct, dict):
+            result = OrderedDict(
+                (key, value) for key, value
+                in struct.items()
+                if key.startswith(input))
+        elif isinstance(struct, list) or isinstance(struct, set):
+            result = [x for x in struct if x.startswith(input)]
+        return result
+
+    def get_completions(self, document, complete_event):
+        self.cur_text = document.text_before_cursor
+        self.cur_word = document.get_word_before_cursor(WORD=True)
+        self.word_list = self.cur_text.split(' ')
+        self.completions = []
+
+        if len(self.word_list) == 1:
+            if self.ash.form == "inventory_form":
+                inventory_names = list(self.ash.inventories_by_name.keys())
+                self.completions = self._match_input(
+                    self.cur_word,
+                    inventory_names
+                )
+
+        for word in self.completions:
+            yield Completion(word, -len(self.cur_word))

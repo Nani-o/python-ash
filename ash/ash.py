@@ -17,7 +17,7 @@ import webbrowser
 import dateutil.parser
 
 from .aap import AAP, API, Inventory, JobTemplate, Project, Job
-from .completer import AshCompleter
+from .completer import AshCompleter, FormCompleter
 from .commands import ROOT_COMMANDS, CD_COMMANDS, LS_COMMANDS, LS_JOB_TEMPLATE_FILTERS, LS_JOBS_FILTERS, LS_PROJECTS_FILTERS, LS_INVENTORIES_FILTERS, JT_COMMANDS, JOB_COMMANDS, INVENTORY_COMMANDS, PROJECT_COMMANDS
 from .colors import COLORS
 
@@ -47,6 +47,7 @@ class Ash(object):
         history_file_path = expanduser("~/.ash_history")
         self.history = FileHistory(history_file_path)
         self.completer = AshCompleter(self)
+        self.form_completer = FormCompleter(self)
         self.style = Style.from_dict(self.colors)
         self.session = PromptSession(history=self.history, style=self.style)
         self.session_wo_history = PromptSession(style=self.style)
@@ -470,6 +471,7 @@ class Ash(object):
         user_input = None
         default_display = None
         multiline = False
+        self.form = None
 
         if var == "variables":
             var = "extra_vars"
@@ -502,8 +504,16 @@ class Ash(object):
             prompt += "\n"
 
         if var == "inventory":
+            self.form = "inventory_form"
             while not user_input:
-                user_input = self.session_wo_history.prompt(prompt, multiline=multiline, default=str(default)) or default
+                user_input = self.session_wo_history.prompt(prompt, multiline=multiline, completer=self.form_completer, default=str(default)) or default
+                if not user_input.isdigit():
+                    if user_input not in self.inventories_by_name:
+                        self.print(f"Invalid inventory. Please enter a valid inventory ID or name.", 'red')
+                        user_input = None
+                    else:
+                        user_input = self.inventories_by_name[user_input].id
+
         else:
             user_input = self.session_wo_history.prompt(prompt, multiline=multiline, default=str(default)) or default
 
