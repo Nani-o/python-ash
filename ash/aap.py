@@ -172,7 +172,12 @@ class JobTemplate(BaseObject):
         asked_vars = []
         for attr in dir(self):
             if attr.startswith('ask_') and getattr(self, attr) is True:
-                asked_vars.append(attr[4:].replace('_on_launch', ''))
+                var = attr[4:].replace('_on_launch', '')
+                if var == 'variables':
+                    var = 'extra_vars'
+                elif var == 'tags':
+                    var = 'job_tags'
+                asked_vars.append(var)
         return asked_vars
 
     def get_survey_spec(self):

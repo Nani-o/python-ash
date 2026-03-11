@@ -473,11 +473,8 @@ class Ash(object):
         multiline = False
         self.form = None
 
-        if var == "variables":
-            var = "extra_vars"
+        if var == "extra_vars":
             multiline = True
-        elif var == "tags":
-            var = "job_tags"
 
         if var == "credential":
             credentials = self.current_context.summary_fields.get('credentials', [])
