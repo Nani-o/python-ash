@@ -412,9 +412,6 @@ class Ash(object):
         else:
             self.print("Failed to cancel the job.", 'red')
 
-    def __cmd_reuse(self, args):
-        self.print("Not implemented yet.", 'red')
-
     def __cmd_output(self, args):
         output = self.current_context.print_stdout()
 
@@ -525,6 +522,11 @@ class Ash(object):
 
         return var, user_input
 
+    def __validate_payload(self, payload):
+        self.print(f"Final payload for launching the job:\n {json.dumps(payload, indent=4)}", 'green_bold')
+        user_input = self.session_wo_history.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ", multiline=False)or "no"
+        return user_input.lower()
+
     def __cmd_launch(self, args):
         payload = {}
 
@@ -541,9 +543,7 @@ class Ash(object):
             elif extra_vars:
                 payload['extra_vars'] = extra_vars
 
-        self.print(f"Final payload for launching the job:\n {json.dumps(payload, indent=4)}", 'green_bold')
-        user_input = self.session_wo_history.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ", multiline=False)or "no"
-        if not user_input.lower() in ['yes', 'y']:
+        if not self.__validate_payload(payload) in ['yes', 'y']:
             self.print("Job launch cancelled.", 'red_bold')
             return
 
@@ -552,6 +552,39 @@ class Ash(object):
         if job:
             self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
             self.__switch_context(job, 'jobs')
+            self.__cmd_output([])
+
+    def __cmd_reuse(self, args):
+        payload = {}
+        job = self.current_context
+
+        template = self.job_templates_by_id.get(job.job_template)
+        if not template:
+            self.print("Original job template not found in cache. Cannot reuse the job.", 'red')
+            return
+
+        for var in template.get_asked_variables():
+            if var in ['inventory', 'limit', 'job_tags', 'skip_tags']:
+                key, user_input = self._ask_variable(var)
+                payload[key] = user_input
+            elif var == 'credential':
+                payload['credential'] = [cred['id'] for cred in job.summary_fields.get('credentials', [])]
+            elif var == 'variables':
+                pass
+            else:
+                payload[var] = getattr(job, var, None)
+
+        payload['extra_vars'] = json.loads(job.extra_vars) if job.extra_vars else {}
+
+        if not self.__validate_payload(payload) in ['yes', 'y']:
+            self.print("Job launch cancelled.", 'red_bold')
+            return
+
+        new_job = template.launch(payload)
+
+        if new_job:
+            self.print(f"Launched job with ID: {new_job.id}, switching context to the new job and displaying output...", 'yellow')
+            self.__switch_context(new_job, 'jobs')
             self.__cmd_output([])
 
     def __cmd_sync(self, args):
