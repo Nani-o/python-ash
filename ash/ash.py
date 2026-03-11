@@ -503,7 +503,7 @@ class Ash(object):
         if var == "inventory":
             self.form = "inventory_form"
             while not user_input:
-                user_input = self.session_wo_history.prompt(prompt, multiline=multiline, completer=self.form_completer, default=str(default)) or default
+                user_input = self.session_wo_history.prompt(prompt, multiline=multiline, completer=self.form_completer, default=str(default))
                 if not user_input.isdigit():
                     if user_input not in self.inventories_by_name:
                         self.print(f"Invalid inventory. Please enter a valid inventory ID or name.", 'red')
@@ -512,7 +512,7 @@ class Ash(object):
                         user_input = self.inventories_by_name[user_input].id
 
         else:
-            user_input = self.session_wo_history.prompt(prompt, multiline=multiline, default=str(default)) or default
+            user_input = self.session_wo_history.prompt(prompt, multiline=multiline, default=str(default))
 
         if var == "credential" and isinstance(user_input, str):
             user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
