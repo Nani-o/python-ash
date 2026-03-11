@@ -229,7 +229,7 @@ class Ash(object):
     def __switch_context(self, context, context_type):
         self.current_context = context
         self.current_context_type = context_type
-        if self.current_context_type != 'jobs':
+        if self.current_context_type != 'jobs' and self.current_context is not None:
             self.current_context.refresh()
             self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
         self.commands = self.__get_commands_for_context(context_type)
