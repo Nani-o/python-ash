@@ -240,8 +240,6 @@ class Project(BaseObject):
 class Job(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
-        if not self.scm_branch:
-            self.scm_branch = "main"
         self.uri = f"jobs/{self.id}"
         self.absolute_url = f"{self.api.base_url}execution/jobs/playbook/{self.id}/output"
 
