@@ -507,6 +507,10 @@ class Ash(object):
                         user_input = None
                     else:
                         user_input = self.inventories_by_name[user_input].id
+                else:
+                    if not self.inventories_by_id.get(int(user_input)):
+                        self.print(f"Invalid inventory ID. Please enter a valid inventory ID or name.", 'red')
+                        user_input = None
 
         else:
             user_input = self.session_wo_history.prompt(prompt, multiline=multiline, default=str(default))
