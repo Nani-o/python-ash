@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from collections import OrderedDict
+import time
 from prompt_toolkit import PromptSession
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import FormattedText
@@ -501,17 +502,16 @@ class Ash(object):
             self.form = "inventory_form"
             while not user_input:
                 user_input = self.session_wo_history.prompt(prompt, multiline=multiline, completer=self.form_completer, default=str(default))
-                if not user_input.isdigit():
-                    if user_input not in self.inventories_by_name:
-                        self.print(f"Invalid inventory. Please enter a valid inventory ID or name.", 'red')
-                        user_input = None
-                    else:
-                        user_input = self.inventories_by_name[user_input].id
-                else:
-                    if not self.inventories_by_id.get(int(user_input)):
-                        self.print(f"Invalid inventory ID. Please enter a valid inventory ID or name.", 'red')
-                        user_input = None
-
+                inventories = []
+                for inventory in user_input.split(','):
+                    if inventory:
+                        inventory = self.__retrieve_inventory(inventory)
+                        if inventory:
+                            inventories.append(inventory.id)
+                        else:
+                            user_input = None
+                            break
+            user_input = inventories if len(inventories) > 1 else inventories[0] if inventories else None
         else:
             user_input = self.session_wo_history.prompt(prompt, multiline=multiline, default=str(default))
 
@@ -526,8 +526,27 @@ class Ash(object):
 
         return var, user_input
 
+    def __retrieve_inventory(self, reference):
+        if not reference.isdigit():
+            if reference not in self.inventories_by_name:
+                self.print(f"Invalid inventory name {reference}. Please enter a valid inventory ID or name.", 'red')
+                inventory = None
+            else:
+                inventory = self.inventories_by_name[reference]
+        else:
+            if not self.inventories_by_id.get(int(reference)):
+                self.print(f"Invalid inventory ID {reference}. Please enter a valid inventory ID or name.", 'red')
+                inventory = None
+            else:
+                inventory = self.inventories_by_id[int(reference)]
+
+        return inventory
+
     def __validate_payload(self, payload):
         self.print(f"Final payload for launching the job:\n {json.dumps(payload, indent=4)}", 'green_bold')
+        if isinstance(payload.get('inventory'), list):
+            inventory_names = [self.inventories_by_id.get(inv_id).name for inv_id in payload['inventory'] if self.inventories_by_id.get(inv_id)]
+            self.print(f"You specified multiple inventories, jobs will be launched sequentially for each inventory: {', '.join(inventory_names)}", 'yellow_bold')
         user_input = self.session_wo_history.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ", multiline=False)or "no"
         return user_input.lower()
 
@@ -551,12 +570,25 @@ class Ash(object):
             self.print("Job launch cancelled.", 'red_bold')
             return
 
-        job = self.current_context.launch(payload)
+        if isinstance(payload.get('inventory'), list):
+            inventory_ids = payload.pop('inventory')
+            for inv_id in inventory_ids:
+                payload_copy = payload.copy()
+                payload_copy['inventory'] = inv_id
+                job = self.current_context.launch(payload_copy)
+                if job:
+                    self.print(f"Launched job with ID: {job.id} for inventory ID: {inv_id}", 'yellow')
+                    while job.status in ['pending', 'waiting', 'running']:
+                        job.refresh()
+                        time.sleep(5)
+                    self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} finished with status: {job.status}", self.status_to_color(job.status))
+        else:
+            job = self.current_context.launch(payload)
 
-        if job:
-            self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
-            self.__switch_context(job, 'jobs')
-            self.__cmd_output([])
+            if job:
+                self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
+                self.__switch_context(job, 'jobs')
+                self.__cmd_output([])
 
     def __cmd_reuse(self, args):
         payload = {}
