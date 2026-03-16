@@ -551,6 +551,35 @@ class Ash(object):
         user_input = self.session_wo_history.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ", multiline=False)or "no"
         return user_input.lower()
 
+    def __execute_payload(self, template, payload):
+        if not self.__validate_payload(payload) in ['yes', 'y']:
+            self.print("Job launch cancelled.", 'red_bold')
+            return
+
+        if isinstance(payload.get('inventory'), list):
+            inventory_ids = payload.pop('inventory')
+            for inv_id in inventory_ids:
+                payload_copy = payload.copy()
+                payload_copy['inventory'] = inv_id
+                job = template.launch(payload_copy)
+                if job:
+                    self.print(f"Launched job with ID: {job.id} for inventory ID: {inv_id}", 'yellow')
+                    while job.status in ['pending', 'waiting', 'running']:
+                        self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} is currently {job.status}. Elapsed time: {str(job.elapsed)}", self.status_to_color(job.status), end='')
+                        job.refresh()
+                        time.sleep(5)
+                        sys.stdout.write('\r')      # Move cursor to the beginning of the line
+                        sys.stdout.write('\033[K')  # Clear to the end of the line
+                    self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} finished with status: {job.status}. Total elapsed time: {str(job.elapsed)}", self.status_to_color(job.status))
+        else:
+            job = template.launch(payload)
+
+            if job:
+                self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
+                self.__switch_context(job, 'jobs')
+                self.__cmd_output([])
+
+
     def __cmd_launch(self, args):
         payload = {}
 
@@ -567,32 +596,7 @@ class Ash(object):
             elif extra_vars:
                 payload['extra_vars'] = extra_vars
 
-        if not self.__validate_payload(payload) in ['yes', 'y']:
-            self.print("Job launch cancelled.", 'red_bold')
-            return
-
-        if isinstance(payload.get('inventory'), list):
-            inventory_ids = payload.pop('inventory')
-            for inv_id in inventory_ids:
-                payload_copy = payload.copy()
-                payload_copy['inventory'] = inv_id
-                job = self.current_context.launch(payload_copy)
-                if job:
-                    self.print(f"Launched job with ID: {job.id} for inventory ID: {inv_id}", 'yellow')
-                    while job.status in ['pending', 'waiting', 'running']:
-                        self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} is currently {job.status}. Elapsed time: {str(job.elapsed)}", self.status_to_color(job.status), end='')
-                        job.refresh()
-                        time.sleep(5)
-                        sys.stdout.write('\r')      # Move cursor to the beginning of the line
-                        sys.stdout.write('\033[K')  # Clear to the end of the line
-                    self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} finished with status: {job.status}. Total elapsed time: {str(job.elapsed)}", self.status_to_color(job.status))
-        else:
-            job = self.current_context.launch(payload)
-
-            if job:
-                self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
-                self.__switch_context(job, 'jobs')
-                self.__cmd_output([])
+        self.__execute_payload(self.current_context, payload)
 
     def __cmd_reuse(self, args):
         payload = {}
@@ -616,16 +620,7 @@ class Ash(object):
 
         payload['extra_vars'] = json.loads(job.extra_vars) if job.extra_vars else {}
 
-        if not self.__validate_payload(payload) in ['yes', 'y']:
-            self.print("Job launch cancelled.", 'red_bold')
-            return
-
-        new_job = template.launch(payload)
-
-        if new_job:
-            self.print(f"Launched job with ID: {new_job.id}, switching context to the new job and displaying output...", 'yellow')
-            self.__switch_context(new_job, 'jobs')
-            self.__cmd_output([])
+        self.__execute_payload(template, payload)
 
     def __cmd_sync(self, args):
         if self.current_context_type == 'job_templates':
