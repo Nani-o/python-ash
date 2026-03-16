@@ -10,6 +10,7 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.styles import Style
 from os.path import expanduser
+from os import get_terminal_size
 from iterfzf import iterfzf
 
 import json
@@ -173,6 +174,17 @@ class Ash(object):
 
         job_templates = self.filter_objects(self.job_templates, args, LS_JOB_TEMPLATE_FILTERS)
         self.display_job_templates(job_templates)
+
+    def __cmd_watch(self, args):
+        while True:
+            args_copy = args.copy()
+            args_copy.append("result_limit:{}".format(get_terminal_size().lines - 2))
+            self.__ls_jobs(args_copy)
+            time.sleep(5)
+            # Move cursor to the beginning of the first line and clear to the end of the screen
+            sys.stdout.write('\033[H')  # Move cursor to the top-left corner
+            sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
+            sys.stdout.flush()
 
     def __ls_jobs(self, args):
         result_limit = 100

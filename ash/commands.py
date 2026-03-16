@@ -5,6 +5,7 @@ from collections import OrderedDict
 ROOT_COMMANDS = OrderedDict([
     ('cd', 'Change context to a specific object (e.g., job_template <name_or_id>)'),
     ('ls', 'List all objects of a certain type (e.g., job_templates, inventories)'),
+    ('watch', 'Watch jobs in real-time with dynamic updates to the dashboard'),
     ('cache', 'Refresh cached data from AAP (mostly for auto-completion)'),
     ('exit', 'Quit program')
 ])
