@@ -2,6 +2,7 @@
 
 from collections import OrderedDict
 import time
+import sys
 from prompt_toolkit import PromptSession
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import FormattedText
@@ -76,11 +77,11 @@ class Ash(object):
 
         return objects
 
-    def print(self, message, class_name=None, attrs=None):
+    def print(self, message, class_name=None, attrs=None, end='\n'):
         if class_name:
-            print_formatted_text(FormattedText([(f'class:{class_name}', message)]), style=self.style)
+            print_formatted_text(FormattedText([(f'class:{class_name}', message)]), style=self.style, end=end)
         else:
-            print(message)
+            print(message, end=end)
 
     def object_to_color(self, obj):
         if isinstance(obj, JobTemplate):
@@ -579,9 +580,12 @@ class Ash(object):
                 if job:
                     self.print(f"Launched job with ID: {job.id} for inventory ID: {inv_id}", 'yellow')
                     while job.status in ['pending', 'waiting', 'running']:
+                        self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} is currently {job.status}. Elapsed time: {str(job.elapsed)}", self.status_to_color(job.status), end='')
                         job.refresh()
                         time.sleep(5)
-                    self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} finished with status: {job.status}", self.status_to_color(job.status))
+                        sys.stdout.write('\r')      # Move cursor to the beginning of the line
+                        sys.stdout.write('\033[K')  # Clear to the end of the line
+                    self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} finished with status: {job.status}. Total elapsed time: {str(job.elapsed)}", self.status_to_color(job.status))
         else:
             job = self.current_context.launch(payload)
 
