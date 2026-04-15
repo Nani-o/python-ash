@@ -188,7 +188,8 @@ class Ash(object):
             sys.stdout.write('\033[H')  # Move cursor to the top-left corner
             sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
             sys.stdout.flush()
-            self.display_jobs(jobs)
+            if jobs: 
+                self.display_jobs(jobs)
             time.sleep(5)
 
     def __parse_ls_jobs_args(self, args):
