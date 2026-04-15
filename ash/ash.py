@@ -647,6 +647,12 @@ class Ash(object):
     def __cmd_template(self, args):
         self.__cd_job_template([str(self.current_context.job_template)])
 
+    def __cmd_project(self, args):
+        self.__cd_project([str(self.current_context.project)])
+
+    def __cmd_inventory(self, args):
+        self.__cd_inventory([str(self.current_context.inventory)])
+
     def _get_objects(self, object_type):
         objects = self.cache.load_cache(object_type)
         if objects:

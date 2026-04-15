@@ -30,7 +30,8 @@ JT_COMMANDS = OrderedDict([
     ('open', 'job_template: Open the selected job template in your browser'),
     ('info', 'job_template: Show information about the selected job template'),
     ('jobs', 'job_template: List jobs launched from the selected job template'),
-    ('sync', 'job_template: Sync the project associated with the selected job template')
+    ('sync', 'job_template: Sync the project associated with the selected job template'),
+    ('project', 'job_template: Switch context to the project of the selected job template')
 ])
 
 JOB_COMMANDS = OrderedDict([
@@ -39,9 +40,11 @@ JOB_COMMANDS = OrderedDict([
     ('open', 'job: Open the selected job in your browser'),
     ('relaunch', 'job: Relaunch the selected job'),
     ('reuse', 'job: Reuse the selected job parameters as prefill for a new job'),
-    ('template', 'job: Switch context to the job template of the selected job'),
     ('cancel', 'job: Cancel the selected job'),
-    ('output', 'job: Show output of the selected job')
+    ('output', 'job: Show output of the selected job'),
+    ('inventory', 'job: Switch context to the inventory of the selected job'),
+    ('project', 'job: Switch context to the project of the selected job'),
+    ('template', 'job: Switch context to the job template of the selected job')
 ])
 
 INVENTORY_COMMANDS = OrderedDict([
