@@ -46,6 +46,8 @@ class Ash(object):
         self._load_all_caches()
         self.current_context = None
         self.current_context_type = None
+        self.last_context = None
+        self.last_context_type = None
         self.colors = COLORS
         history_file_path = expanduser("~/.ash_history")
         self.history = FileHistory(history_file_path)
@@ -243,12 +245,27 @@ class Ash(object):
     # The context is switched to the specified object and the available commands are updated accordingly.
 
     def __switch_context(self, context, context_type):
+        self.last_context = self.current_context
+        self.last_context_type = self.current_context_type
         self.current_context = context
         self.current_context_type = context_type
-        if self.current_context_type != 'jobs' and self.current_context is not None:
-            self.current_context.refresh()
-            self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
+        if self.current_context is not None:
+            if self.current_context_type != 'jobs':
+                self.current_context.refresh()
+                self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
+            if context_type == 'job_templates':
+                self.print(f"Switched context to Job Template: ID={context.id}, Name={context.name}", 'cyan')
+            elif context_type == 'jobs':
+                self.print(f"Switched context to Job: ID={context.id}, Name={context.name}", self.status_to_color(context.status))
+            elif context_type == 'inventories':
+                self.print(f"Switched context to Inventory: ID={context.id}, Name={context.name}", 'green')
+            elif context_type == 'projects':
+                self.print(f"Switched context to Project: ID={context.id}, Name={context.name}", 'orange')
+        else:
+            self.print("Switched to root context", 'white')
+
         self.commands = self.__get_commands_for_context(context_type)
+
 
     def __get_commands_for_context(self, context_type):
         if context_type == 'job_templates':
@@ -265,16 +282,21 @@ class Ash(object):
     def __cmd_cd(self, args):
         if len(args) == 0:
             self.__switch_context(None, None)
-            print("Switched to root context.")
             return
         elif len(args) < 2:
-            print("Usage: cd <object_type> <name_or_id>")
+            if args[0] == '-':
+                if self.last_context:
+                    self.__switch_context(self.last_context, self.last_context_type)
+                else:
+                    self.print("No previous context to switch back to.", 'red')
+            else:
+                self.print("Usage: cd <object_type> <name_or_id>", 'red')
             return
 
         object_type = args[0]
 
         if object_type not in CD_COMMANDS.keys():
-            print(f"Unknown object type: {object_type}")
+            self.print(f"Unknown object type: {object_type}", 'red')
             return
 
         method = getattr(self, f'_Ash__cd_{object_type}', None)
@@ -291,7 +313,6 @@ class Ash(object):
         if not jt:
             self.print(f"Job Template '{identifier}' not found.", 'red')
             return
-        self.print(f"Switched context to Job Template: ID={jt.id}, Name={jt.name}", 'cyan')
         self.__switch_context(jt, 'job_templates')
 
     def __cd_job(self, args):
@@ -310,7 +331,6 @@ class Ash(object):
         if not job:
             self.print(f"Job '{identifier}' not found.", 'red')
             return
-        self.print(f"Switched context to Job: ID={job.id}, Name={job.name}", self.status_to_color(job.status))
         self.__switch_context(job, 'jobs')
 
     def __cd_inventory(self, args):
@@ -324,7 +344,6 @@ class Ash(object):
         if not inv:
             self.print(f"Inventory '{identifier}' not found.", 'red')
             return
-        self.print(f"Switched context to Inventory: ID={inv.id}, Name={inv.name}", 'green')
         self.__switch_context(inv, 'inventories')
 
     def __cd_project(self, args):
@@ -338,7 +357,6 @@ class Ash(object):
         if not proj:
             self.print(f"Project '{identifier}' not found.", 'red')
             return
-        self.print(f"Switched context to Project: ID={proj.id}, Name={proj.name}", 'orange')
         self.__switch_context(proj, 'projects')
 
     def __find_matching_objects(self, objects, identifier):
