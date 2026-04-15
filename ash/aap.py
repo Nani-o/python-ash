@@ -126,7 +126,7 @@ class AAP():
         response = self.api.get_request(f"jobs/{job_id}/")
 
         if response is None or response.status_code != 200:
-            self.log_error(response)
+            self.api.log_error(response)
             return None
 
         return Job(self.api, response.json())
