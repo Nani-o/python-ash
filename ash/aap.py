@@ -92,6 +92,8 @@ class API():
             return JobTemplate(self, data)
         if object_type == "jobs":
             return Job(self, data)
+        if object_type == "hosts":
+            return Host(self, data)
 
         return None
 
@@ -206,16 +208,7 @@ class Inventory(BaseObject):
         return f"Inventory(id={self.id}, name={self.name})"
 
     def get_hosts(self):
-        response = self.api.get_request(f"{self.uri}/hosts/")
-
-        if response is None or response.status_code != 200:
-            self.log_error(response)
-            return []
-
-        hosts = []
-        for item in response.json().get('results', []):
-            hosts.append(Host(self.api, item))
-        return hosts
+        return self.api.retrieves_objects("hosts", baseuri=f"{self.uri}/hosts/", result_limit=0)
 
 class Host(BaseObject):
     def __init__(self, api, data):
