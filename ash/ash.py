@@ -177,41 +177,43 @@ class Ash(object):
 
     def __cmd_watch(self, args):
         while True:
-            args_copy = args.copy()
-            args_copy.append("result_limit:{}".format(get_terminal_size().lines - 2))
-            self.__ls_jobs(args_copy)
-            time.sleep(5)
+            result_limit = get_terminal_size().lines - 2
+            filters = self.__parse_ls_jobs_args(args)[0]
+            jobs = self.aap.get_jobs(filters=filters, result_limit=result_limit)
             # Move cursor to the beginning of the first line and clear to the end of the screen
             sys.stdout.write('\033[H')  # Move cursor to the top-left corner
             sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
             sys.stdout.flush()
+            self.display_jobs(jobs)
+            time.sleep(5)
+
+    def __parse_ls_jobs_args(self, args):
+        result_limit = 100
+        filters = {}
+        for arg in [a.lower() for a in args]:
+            if ':' in arg and arg.split(':', 1)[0] in LS_JOBS_FILTERS.keys():
+                filter_key, filter_value = arg.split(':', 1)
+                if filter_key == 'result_limit':
+                    try:
+                        filter_value = int(filter_value)
+                    except ValueError:
+                        self.print("Invalid result_limit value. It should be an integer.", 'red')
+                        return None, None
+                    result_limit = filter_value
+                    continue
+                filter_key = f"{filter_key}__search"
+            else:
+                filter_key = "search"
+                filter_value = arg
+
+            if filter_key in filters:
+                filters[filter_key].append(filter_value)
+            else:
+                filters[filter_key] = [filter_value]
+        return filters, result_limit
 
     def __ls_jobs(self, args):
-        result_limit = 100
-        if args:
-            filters = {}
-            for arg in [a.lower() for a in args]:
-                if ':' in arg and arg.split(':', 1)[0] in LS_JOBS_FILTERS.keys():
-                    filter_key, filter_value = arg.split(':', 1)
-                    if filter_key == 'result_limit':
-                        try:
-                            filter_value = int(filter_value)
-                        except ValueError:
-                            self.print("Invalid result_limit value. It should be an integer.", 'red')
-                            return
-                        result_limit = filter_value
-                        continue
-                    filter_key = f"{filter_key}__search"
-                else:
-                    filter_key = "search"
-                    filter_value = arg
-
-                if filter_key in filters:
-                    filters[filter_key].append(filter_value)
-                else:
-                    filters[filter_key] = [filter_value]
-        else:
-            filters = None
+        filters, result_limit = self.__parse_ls_jobs_args(args)
         jobs = self.aap.get_jobs(filters=filters, result_limit=result_limit)
         if jobs:
             self.display_jobs(jobs)
