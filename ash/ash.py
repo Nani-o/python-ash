@@ -144,6 +144,8 @@ class Ash(object):
                 max_len = max([len(str(getattr(obj, col))) for obj in objects] + [len(col)])
             if col == 'limit' and max_len > 30:
                 max_len = 30
+            elif col == 'scm_branch' and max_len > 25:
+                max_len = 25
             column_widths[col] = max_len
 
         format_str = "   ".join([f"{{:<{column_widths[col]}}}" for col in columns])
