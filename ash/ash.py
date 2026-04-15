@@ -300,7 +300,7 @@ class Ash(object):
         if identifier.isdigit():
             job = self.aap.get_job(int(identifier))
         else:
-            jobs = list(reversed(self.aap.get_jobs(filters={'search': identifier}, result_limit=10)))
+            jobs = list(reversed(self.aap.get_jobs(filters={'search': identifier}, result_limit=100)))
             if jobs:
                 jobs_list = ["{}: {} - {:<15} {} {}".format(job.id, job.name, self.parse_label(job.limit, 15), job.status, self.parse_label(job.created)) for job in jobs]
                 job = self.__multiple_choice_prompt("Job", f"Multiple jobs found matching '{identifier}'. Please select one:", jobs_list, required=True)
