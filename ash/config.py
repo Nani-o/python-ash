@@ -30,8 +30,12 @@ class Config():
        Loads configuration from a YAML file and provides
        access to the settings as attributes."""
 
-    def __init__(self):
-        self.data_folder = Path.home().joinpath(".local", "share", "ash")
+    def __init__(self, config_file=None):
+        if not config_file:
+            self.data_folder = Path.home().joinpath(".local", "share", "ash")
+            if not self.data_folder.exists():
+                self.data_folder.mkdir(parents=True, exist_ok=True)
+            config_file = self.data_folder.joinpath('config.yml')
         config = self.__load_config()
         for k, v in config.items():
             if k in CONFIGS:
@@ -42,9 +46,6 @@ class Config():
         self.config = config
 
     def __load_config(self):
-        if not self.data_folder.exists():
-            self.data_folder.mkdir(parents=True, exist_ok=True)
-        config_file = self.data_folder.joinpath('config.yml')
         if os.path.exists(config_file):
             with open(config_file, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
