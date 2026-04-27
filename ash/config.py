@@ -48,8 +48,8 @@ class Config():
         self.config = config
 
     def __load_config(self):
-        if os.path.exists(config_file):
-            with open(config_file, 'r', encoding='utf-8') as f:
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
             return config
 
