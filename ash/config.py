@@ -35,7 +35,9 @@ class Config():
             self.data_folder = Path.home().joinpath(".local", "share", "ash")
             if not self.data_folder.exists():
                 self.data_folder.mkdir(parents=True, exist_ok=True)
-            config_file = self.data_folder.joinpath('config.yml')
+            self.config_file = self.data_folder.joinpath('config.yml')
+        else:
+            self.config_file = config_file
         config = self.__load_config()
         for k, v in config.items():
             if k in CONFIGS:
