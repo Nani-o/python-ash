@@ -58,8 +58,12 @@ class API():
             url += f"&order_by={order_by}"
         if filters:
             for key, value in filters.items():
-                for v in value:
-                    url += f"&{key}={v}"
+                if key == 'search':
+                    values = '+'.join(value)
+                    url += f"&{key}={values}"
+                else:
+                    for v in value:
+                        url += f"&{key}={v}"
 
         response = self.get_request(url)
         if response is None or response.status_code != 200:
