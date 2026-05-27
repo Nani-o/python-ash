@@ -40,7 +40,7 @@ class Ash(object):
             api_path = config.api_path
         else:
             api_path = "/api/controller/v2/"
-        self.api = API(config.base_url, config.token, api_path=api_path)
+        self.api = API(config.base_url, config.token, api_path)
         self.aap = AAP(self.api)
         self.cache = cache
         self._load_all_caches()
