@@ -162,7 +162,7 @@ class JobTemplate(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
         self.uri = f"job_templates/{self.id}"
-        self.absolute_url = f"{self.api.base_url}execution/templates/job-template/{self.id}"
+        self.absolute_url = requests.compat.urljoin(self.api.base_url, f"execution/templates/job-template/{self.id}")
 
     def __str__(self):
         return f"JobTemplate(id={self.id}, name={self.name})"
@@ -204,7 +204,7 @@ class Inventory(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
         self.uri = f"inventories/{self.id}"
-        self.absolute_url = f"{self.api.base_url}execution/infrastructure/inventories/inventory/{self.id}/details"
+        self.absolute_url = requests.compat.urljoin(self.api.base_url, f"execution/infrastructure/inventories/inventory/{self.id}/details")
 
     def __str__(self):
         return f"Inventory(id={self.id}, name={self.name})"
@@ -216,7 +216,7 @@ class Host(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
         self.uri = f"inventory/{self.inventory}/hosts/{self.id}"
-        self.absolute_url = f"{self.api.base_url}execution/infrastructure/inventories/inventory/{self.inventory}/hosts/{self.id}/details"
+        self.absolute_url = requests.compat.urljoin(self.api.base_url, f"execution/infrastructure/inventories/inventory/{self.inventory}/hosts/{self.id}/details")
 
     def __str__(self):
         return f"Host(id={self.id}, name={self.name})"
@@ -225,7 +225,7 @@ class Project(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
         self.uri = f"projects/{self.id}"
-        self.absolute_url = f"{self.api.base_url}execution/projects/{self.id}/details"
+        self.absolute_url = requests.compat.urljoin(self.api.base_url, f"execution/projects/{self.id}/details")
 
     def __str__(self):
         return f"Project(id={self.id}, name={self.name})"
@@ -241,7 +241,7 @@ class Job(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
         self.uri = f"jobs/{self.id}"
-        self.absolute_url = f"{self.api.base_url}execution/jobs/playbook/{self.id}/output"
+        self.absolute_url = requests.compat.urljoin(self.api.base_url, f"execution/jobs/playbook/{self.id}/output")
 
     def __str__(self):
         return f"Job(id={self.id}, name={self.name}, status={self.status})"
