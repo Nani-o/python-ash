@@ -25,7 +25,7 @@ class API():
 
     def get_request(self, endpoint):
         try:
-            response = requests.get(requests.compat.urljoin(self.url + endpoint), headers=self.headers,
+            response = requests.get(requests.compat.urljoin(self.url, endpoint), headers=self.headers,
                                     verify=False, timeout=10)
             return response
         except requests.exceptions.RequestException as e:
@@ -34,7 +34,7 @@ class API():
 
     def post_request(self, endpoint, payload):
         try:
-            response = requests.post(requests.compat.urljoin(self.url + endpoint), headers=self.headers,
+            response = requests.post(requests.compat.urljoin(self.url, endpoint), headers=self.headers,
                                      json=payload, verify=False, timeout=10)
             return response
         except requests.exceptions.RequestException as e:
