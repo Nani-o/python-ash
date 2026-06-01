@@ -53,6 +53,7 @@ INVENTORY_COMMANDS = OrderedDict([
     ('open', 'inventory: Open the selected inventory in your browser'),
     ('hosts', 'inventory: List hosts in the selected inventory'),
     ('add_hosts', 'inventory: Add hosts to the selected inventory'),
+    ('clear_hosts', 'inventory: Delete all hosts from the selected inventory')
 ])
 
 PROJECT_COMMANDS = OrderedDict([

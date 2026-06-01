@@ -451,6 +451,19 @@ class Ash(object):
                 else:
                     self.print(f"{host}: Failed to add host. Status code: {result.status_code}", 'red')
 
+    def __cmd_clear_hosts(self, args):
+        confirmation = self.session_wo_history.prompt("Are you sure you want to delete all hosts from this inventory? This action cannot be undone. [no]: ", multiline=False) or "no"
+        if confirmation.lower() in ['yes', 'y']:
+            results = self.current_context.clear_hosts()
+            for host, result in results.items():
+                if result is not None:
+                    if result.status_code in [204]:
+                        self.print(f"{host}: Host deleted successfully.", 'green')
+                    else:
+                        self.print(f"{host}: Failed to delete host. Status code: {result.status_code}", 'red')
+        else:
+            self.print("Operation cancelled.", 'yellow')
+
     def __cmd_relaunch(self, args):
         job = self.current_context.relaunch()
         if job:

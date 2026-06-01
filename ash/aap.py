@@ -41,6 +41,15 @@ class API():
             print(colored(f"Error connecting to API: {e}", 'red'))
             return None
 
+    def delete_request(self, endpoint):
+        try:
+            response = requests.delete(requests.compat.urljoin(self.url, endpoint), headers=self.headers,
+                                       verify=False, timeout=10)
+            return response
+        except requests.exceptions.RequestException as e:
+            print(colored(f"Error connecting to API: {e}", 'red'))
+            return None
+
     def retrieves_objects(self, object_type, result_limit=10, order_by=None,
                           baseuri=None, filters=None):
         if not result_limit or result_limit > 100:
@@ -223,6 +232,18 @@ class Inventory(BaseObject):
             }
             result = self.api.post_request(f"{self.uri}/hosts/", payload)
             results[host] = result
+        return results
+
+    def clear_hosts(self):
+        hosts = self.get_hosts()
+        results = {}
+        for host in hosts:
+            result = self.api.get_request(f"hosts/{host.id}/")
+            if result is not None and result.status_code == 200:
+                delete_result = self.api.delete_request(f"hosts/{host.id}")
+                results[host.name] = delete_result
+            else:
+                results[host.name] = result
         return results
 
 
