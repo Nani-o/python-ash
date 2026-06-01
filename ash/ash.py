@@ -188,7 +188,7 @@ class Ash(object):
             sys.stdout.write('\033[H')  # Move cursor to the top-left corner
             sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
             sys.stdout.flush()
-            if jobs: 
+            if jobs:
                 self.display_jobs(jobs)
             time.sleep(5)
 
@@ -433,6 +433,23 @@ class Ash(object):
                 print(f"{host.id}: {host.name}")
         else:
             print("No hosts found in this inventory.")
+
+    def __cmd_add_hosts(self, args):
+        self.print("(Multi-line input enabled. Use Meta+Enter or Escape followed by Enter to finish input)", 'yellow')
+        prompt = "Hosts to add (one per line):"
+        prompt += "\n"
+
+        user_input = self.session_wo_history.prompt(prompt, multiline=True)
+        results = self.current_context.add_hosts(user_input.splitlines())
+
+        for host, result in results.items():
+            if result is not None:
+                if result.status_code in [201]:
+                    self.print(f"{host}: Host added successfully.", 'green')
+                elif result.status_code == 400:
+                    self.print(f"{host}: {result.json().get('__all__', ['Unknown error'])[0]}", 'red')
+                else:
+                    self.print(f"{host}: Failed to add host. Status code: {result.status_code}", 'red')
 
     def __cmd_relaunch(self, args):
         job = self.current_context.relaunch()

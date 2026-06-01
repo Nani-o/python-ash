@@ -212,6 +212,20 @@ class Inventory(BaseObject):
     def get_hosts(self):
         return self.api.retrieves_objects("hosts", baseuri=f"{self.uri}/hosts/", result_limit=0)
 
+    def add_hosts(self, hosts):
+        results = {}
+        for host in hosts:
+            payload = {
+                "description": "Added using ash command line",
+                "enabled": True,
+                "name": host
+                # "variables": "string"
+            }
+            result = self.api.post_request(f"{self.uri}/hosts/", payload)
+            results[host] = result
+        return results
+
+
 class Host(BaseObject):
     def __init__(self, api, data):
         super().__init__(api, data)
