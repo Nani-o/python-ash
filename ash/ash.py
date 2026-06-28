@@ -586,6 +586,8 @@ class Ash(object):
         if var == "extra_vars":
             try:
                 user_input = yaml.safe_load(user_input) if user_input else {}
+                if user_input == None:
+                    user_input = {}
             except yaml.YAMLError as e:
                 self.print(f"Error parsing YAML: {e}", 'red')
                 return
