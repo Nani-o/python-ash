@@ -18,6 +18,7 @@ import re
 import yaml
 import webbrowser
 import dateutil.parser
+import subprocess
 
 from .aap import AAP, API, Inventory, JobTemplate, Project, Job
 from .completer import AshCompleter, FormCompleter
@@ -401,6 +402,17 @@ class Ash(object):
         if self.current_context_type != 'jobs':
             self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
         print("Context refreshed.")
+
+    def __cmd_url(self, args):
+        url = self.current_context.absolute_url
+        if url:
+            try:
+                subprocess.run("pbcopy", universal_newlines=True, input=url)
+                print(f"{url} copied to clipboard.")
+            except Exception:
+                print("Unable to copy URL to clipboard. Please copy it manually : {url}")
+        else:
+            print("Unable to get URL for the current context.", 'red')
 
     def __cmd_open(self, args):
         url = self.current_context.absolute_url
