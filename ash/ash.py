@@ -529,7 +529,6 @@ class Ash(object):
                         user_input = self.session_wo_history.prompt(f"{name} ({description}) [required]: ", multiline=False)
                 else:
                     user_input = self.session_wo_history.prompt(f"{name} ({description}) [{default}]: ", multiline=False) or default
-                print(f"Set variable '{variable}' to '{user_input}'")
             elif type == 'multiplechoice':
                 choices = question.get('choices', [])
                 user_input = self.__multiple_choice_prompt(name, description, choices, default=default, required=required)
