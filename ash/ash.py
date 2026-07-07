@@ -606,18 +606,21 @@ class Ash(object):
         return var, user_input
 
     def __retrieve_inventory(self, reference):
-        if not reference.isdigit():
-            if reference not in self.inventories_by_name:
-                self.print(f"Invalid inventory name {reference}. Please enter a valid inventory ID or name.", 'red')
-                inventory = None
-            else:
-                inventory = self.inventories_by_name[reference]
+        if reference.isdigit():
+            inventory = self.inventories_by_id.get(int(reference))
+            if not inventory:
+                inventory = self.aap.get_inventory(int(reference))  # Attempt to fetch from API if not in cache
+                if inventory:
+                    self.inventories.append(inventory)
+                    self.inventories_by_id[int(reference)] = inventory
+                    self.inventories_by_name[inventory.name] = inventory
+                    self.cache.insert_cache('inventories', inventory.id, inventory)
+                else:
+                    self.print(f"Invalid inventory ID {reference}. Please enter a valid inventory ID or name.", 'red')
         else:
-            if not self.inventories_by_id.get(int(reference)):
-                self.print(f"Invalid inventory ID {reference}. Please enter a valid inventory ID or name.", 'red')
-                inventory = None
-            else:
-                inventory = self.inventories_by_id[int(reference)]
+            inventory = self.inventories_by_name.get(reference)
+            if not inventory:
+                self.print(f"Invalid inventory name {reference}. Please enter a valid inventory ID or name.", 'red')
 
         return inventory
 
