@@ -42,6 +42,7 @@ class Ash(object):
         else:
             api_path = "/api/controller/v2/"
         self.api = API(config.base_url, config.token, api_path)
+        self.api_description = getattr(config, 'description', None)
         self.aap = AAP(self.api)
         self.cache = cache
         self._load_all_caches()
@@ -756,6 +757,8 @@ class Ash(object):
     def get_prompt(self):
         prompt = []
         prompt.append(('class:white', 'ash '))
+        if self.api_description:
+            prompt.append(('class:white', f'[{self.api_description}] '))
         if self.current_context:
             if isinstance(self.current_context, JobTemplate):
                 prompt.append(('class:cyan', f'JobTemplate[{self.current_context.id}] - {self.current_context.name} '))

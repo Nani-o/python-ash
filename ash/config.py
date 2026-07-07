@@ -7,6 +7,7 @@
 import os
 import sys
 from pathlib import Path
+from iterfzf import iterfzf
 
 import yaml
 
@@ -22,7 +23,8 @@ api_path: "/api/controller/v2/"
 CONFIGS = [
     'base_url',
     'token',
-    'api_path'
+    'api_path',
+    'description'
 ]
 
 class Config():
@@ -39,6 +41,25 @@ class Config():
         else:
             self.config_file = config_file
         config = self.__load_config()
+        if not isinstance(config, dict):
+            if len(config) == 1:
+                config = config[0]
+            else:
+                choices = []
+                for idx, item in enumerate(config):
+                    description = item.get('description', 'No description provided')
+                    base_url = item.get('base_url', 'No base_url provided')
+                    choices.append(f"{idx + 1}. {base_url} - {description}")
+
+                options = {"--layout=reverse"}
+                height = len(choices) + 2
+                user_input = None
+                options.add(f"--height={height}")
+                while not user_input:
+                    user_input = iterfzf(choices, prompt="Multiple configurations found in the config file. Please select one:", __extra__=options)
+                idx = int(user_input.split('.')[0]) - 1
+                config = config[idx]
+
         for k, v in config.items():
             if k in CONFIGS:
                 setattr(self, k, v)

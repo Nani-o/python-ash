@@ -24,50 +24,52 @@ class Cache(object):
         self._create_table('inventories')
 
     def _create_table(self, table_name):
-        self.__execute_sql(f'''CREATE TABLE IF NOT EXISTS {self.base64_encoded_aap_url}_{table_name}
+        self.__execute_sql(f'''CREATE TABLE IF NOT EXISTS "{self.base64_encoded_aap_url}_{table_name}"
                               (id integer primary key,
-                               aap_url text,
                                data blob)''')
 
     def _drop_all_tables(self):
         # List all tables in the database
-        tables = self.__execute_sql("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = self.__execute_sql("SELECT name FROM sqlite_master WHERE type='table';", fetchone=False)
         for table in tables:
-            self.__execute_sql(f'DROP TABLE IF EXISTS {table[0]}')
+            self.__execute_sql(f'DROP TABLE IF EXISTS "{table[0]}"')
 
     def clean_cache(self, args=None):
         if args:
             if args == "job_templates":
-                self.__execute_sql(f'DELETE FROM {self.base64_encoded_aap_url}_job_templates')
+                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_job_templates"')
             elif args == "projects":
-                self.__execute_sql(f'DELETE FROM {self.base64_encoded_aap_url}_projects')
+                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_projects"')
             elif args == "inventories":
-                self.__execute_sql(f'DELETE FROM {self.base64_encoded_aap_url}_inventories')
+                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_inventories"')
         else:
-            self.__execute_sql(f'DELETE FROM {self.base64_encoded_aap_url}_job_templates')
-            self.__execute_sql(f'DELETE FROM {self.base64_encoded_aap_url}_projects')
-            self.__execute_sql(f'DELETE FROM {self.base64_encoded_aap_url}_inventories')
+            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_job_templates"')
+            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_projects"')
+            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_inventories"')
 
     def insert_cache(self, table_name, id, data):
         data_pickled = pickle.dumps(data)
-        self.__execute_sql(f'''INSERT OR REPLACE INTO {self.base64_encoded_aap_url}_{table_name} (id, data) VALUES(?, ?)''', (id, data_pickled))
+        self.__execute_sql(f'''INSERT OR REPLACE INTO "{self.base64_encoded_aap_url}_{table_name}" (id, data) VALUES(?, ?)''', (id, data_pickled))
 
     def load_cache(self, table_name):
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
-        c.execute(f'''SELECT data FROM {self.base64_encoded_aap_url}_{table_name}''')
+        c.execute(f'''SELECT data FROM "{self.base64_encoded_aap_url}_{table_name}"''')
         rows = c.fetchall()
         conn.close()
         return [pickle.loads(row[0]) for row in rows]
 
-    def __execute_sql(self, query, parameters=None):
+    def __execute_sql(self, query, parameters=None, fetchone=True):
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
         if parameters:
             c.execute(query, parameters)
         else:
             c.execute(query)
-        r = c.fetchone()
+        if fetchone:
+            r = c.fetchone()
+        else:
+            r = c.fetchall()
         if not r:
             r = c.lastrowid
         conn.commit()
