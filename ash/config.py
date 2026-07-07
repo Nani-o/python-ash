@@ -12,19 +12,32 @@ from iterfzf import iterfzf
 import yaml
 
 CONFIG_EXAMPLE = """
-example :
+Simple configuration example:
 ---
 base_url: "https://your-aap-url.com"
 token: "your-token"
 api_path: "/api/controller/v2/"
 ...
+
+Or multiple configurations:
+---
+- base_url: "https://your-aap-url.com
+  token: "your-token"
+  api_path: "/api/controller/v2/"
+  description: "My AAP instance"
+  description_color: "green"
+- base_url: "https://your-other-aap-url.com"
+  token: "your-other-token"
+  api_path: "/api/controller/v2/"
+  description: "My other AAP instance"
 """
 
 CONFIGS = [
     'base_url',
     'token',
     'api_path',
-    'description'
+    'description',
+    'description_color'
 ]
 
 class Config():
@@ -74,6 +87,6 @@ class Config():
                 config = yaml.safe_load(f)
             return config
 
-        print("You must create a config file " + str(config_file))
+        print("You must create a config file " + str(self.config_file))
         print(CONFIG_EXAMPLE)
         sys.exit(1)
