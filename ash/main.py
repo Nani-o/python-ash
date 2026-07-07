@@ -13,11 +13,11 @@ def main():
     parser = argparse.ArgumentParser(prog='Ash', description='Ansible Shell for AAP')
     parser.add_argument('-c', '--config')
     args = parser.parse_args()
-    
+
     config_file = args.config
 
     config = Config(config_file)
-    cache = Cache()
+    cache = Cache(config.base_url)
 
     ash = Ash(config, cache)
     ash.run()
