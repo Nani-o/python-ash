@@ -34,18 +34,12 @@ class Cache(object):
         for table in tables:
             self.__execute_sql(f'DROP TABLE IF EXISTS "{table[0]}"')
 
+    _CACHE_TABLES = ('job_templates', 'projects', 'inventories')
+
     def clean_cache(self, args=None):
-        if args:
-            if args == "job_templates":
-                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_job_templates"')
-            elif args == "projects":
-                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_projects"')
-            elif args == "inventories":
-                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_inventories"')
-        else:
-            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_job_templates"')
-            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_projects"')
-            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_inventories"')
+        tables = [args] if args else self._CACHE_TABLES
+        for table in tables:
+            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_{table}"')
 
     def insert_cache(self, table_name, id, data):
         data_pickled = pickle.dumps(data)
