@@ -25,6 +25,10 @@ from .commands import (
 )
 from .types import ContextType
 
+# Variables from a previous job that the user should be prompted to re-enter
+# when reusing a job (rather than being silently copied from the old job).
+_REUSE_PROMPT_VARS = frozenset(('inventory', 'limit', 'job_tags', 'skip_tags'))
+
 
 class CommandHandlersMixin:
     """Mixin that implements all interactive commands for the Ash shell."""
@@ -532,8 +536,10 @@ class CommandHandlersMixin:
             'credential': self._ask_credential_var,
             'extra_vars': self._ask_extra_vars_var,
         }
-        handler = var_handlers.get(var, lambda: self._ask_simple_var(var))
-        return handler()
+        handler = var_handlers.get(var)
+        if handler:
+            return handler()
+        return self._ask_simple_var(var)
 
     def _retrieve_inventory(self, reference):
         if reference.isdigit():
@@ -653,7 +659,7 @@ class CommandHandlersMixin:
             return
 
         for var in template.get_asked_variables():
-            if var in ('inventory', 'limit', 'job_tags', 'skip_tags'):
+            if var in _REUSE_PROMPT_VARS:
                 result = self._ask_variable(var)
                 if result is None:
                     return

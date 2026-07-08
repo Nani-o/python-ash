@@ -36,8 +36,8 @@ class Cache(object):
 
     _CACHE_TABLES = ('job_templates', 'projects', 'inventories')
 
-    def clean_cache(self, args=None):
-        tables = [args] if args else self._CACHE_TABLES
+    def clean_cache(self, table_name=None):
+        tables = [table_name] if table_name else self._CACHE_TABLES
         for table in tables:
             self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_{table}"')
 
