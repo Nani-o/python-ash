@@ -12,6 +12,15 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from .models import Inventory, Project, JobTemplate, Job, Host
 
+
+OBJECT_FACTORIES = {
+    "inventories": Inventory,
+    "projects": Project,
+    "job_templates": JobTemplate,
+    "jobs": Job,
+    "hosts": Host,
+}
+
 class API():
     def __init__(self, baseurl, token, api_path):
         self.base_url = baseurl
@@ -95,18 +104,11 @@ class API():
         return objects
 
     def instantiate_object(self, object_type, data):
-        if object_type == "inventories":
-            return Inventory(self, data)
-        if object_type == "projects":
-            return Project(self, data)
-        if object_type == "job_templates":
-            return JobTemplate(self, data)
-        if object_type == "jobs":
-            return Job(self, data)
-        if object_type == "hosts":
-            return Host(self, data)
+        object_factory = OBJECT_FACTORIES.get(object_type)
+        if object_factory is None:
+            return None
 
-        return None
+        return object_factory(self, data)
 
     def log_error(self, response):
         if response is None:
