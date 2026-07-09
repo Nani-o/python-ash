@@ -9,10 +9,8 @@ import os
 
 from collections import OrderedDict
 
-class AshCompleter(Completer):
-    def __init__(self, ash_instance):
-        self.ash = ash_instance
 
+class BaseCompleter(Completer):
     def _match_input(self, input, struct):
         if isinstance(struct, dict):
             result = OrderedDict(
@@ -22,6 +20,9 @@ class AshCompleter(Completer):
         elif isinstance(struct, list) or isinstance(struct, set):
             result = [x for x in struct if x.startswith(input)]
         return result
+
+
+class AshCompleter(BaseCompleter):
 
     def get_completions(self, document, complete_event):
         self.cur_text = document.text_before_cursor
@@ -95,19 +96,9 @@ class AshCompleter(Completer):
 
             yield Completion(word, -len(self.cur_word), display_meta=meta)
 
-class FormCompleter(Completer):
+class FormCompleter(BaseCompleter):
     def __init__(self, ash_instance):
         self.ash = ash_instance
-
-    def _match_input(self, input, struct):
-        if isinstance(struct, dict):
-            result = OrderedDict(
-                (key, value) for key, value
-                in struct.items()
-                if key.startswith(input))
-        elif isinstance(struct, list) or isinstance(struct, set):
-            result = [x for x in struct if x.startswith(input)]
-        return result
 
     def get_completions(self, document, complete_event):
         self.cur_text = document.text_before_cursor
