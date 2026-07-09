@@ -9,7 +9,7 @@ from ash.ash import Ash
 from ash.commands import JT_COMMANDS, ROOT_COMMANDS
 
 
-LS_JOBS_COMMAND = "ls jobs project:demo nightly result_limit:5"
+LIST_JOBS_COMMAND = "ls jobs project:demo nightly result_limit:5"
 
 
 class BareAsh(Ash):
@@ -26,7 +26,7 @@ class TestAshBehavior(unittest.TestCase):
 
     def test_run_dispatches_known_command_with_args(self):
         self.ash.session = Mock()
-        self.ash.session.prompt = Mock(side_effect=[LS_JOBS_COMMAND, "exit"])
+        self.ash.session.prompt = Mock(side_effect=[LIST_JOBS_COMMAND, "exit"])
         self.ash.get_prompt = Mock(return_value=[])
         self.ash.aap = Mock()
         self.ash.aap.get_jobs.return_value = []
@@ -84,14 +84,14 @@ class TestAshBehavior(unittest.TestCase):
             name="Deploy App",
             data={
                 "summary_fields": {"project": {"name": "Core Platform"}},
-                "project": "core-platform",
+                "project": "Core Platform",
             },
         )
         other = SimpleNamespace(
             name="Cleanup",
             data={
                 "summary_fields": {"project": {"name": "Operations"}},
-                "project": "operations",
+                "project": "Operations",
             },
         )
         filter_definitions = {"project": "Filter by project"}
@@ -106,7 +106,11 @@ class TestAshBehavior(unittest.TestCase):
         self.ash.session.prompt = Mock(side_effect=["launch", "exit"])
         self.ash.get_prompt = Mock(return_value=[])
         self.ash.session_wo_history = Mock()
-        self.ash.session_wo_history.prompt = Mock(side_effect=["", "yes"])
+        survey_prompt_response = ""
+        launch_confirmation = "yes"
+        self.ash.session_wo_history.prompt = Mock(
+            side_effect=[survey_prompt_response, launch_confirmation]
+        )
         self.ash.current_context = Mock()
         self.ash.current_context.get_asked_variables.return_value = ["inventory", "extra_vars"]
         self.ash.current_context.survey_enabled = True
