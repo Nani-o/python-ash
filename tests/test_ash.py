@@ -7,6 +7,12 @@ from unittest.mock import Mock, call
 
 from ash.ash import Ash
 from ash.commands import JT_COMMANDS, ROOT_COMMANDS
+from ash.handlers.base import BaseHandler
+from ash.handlers.root import RootHandler
+from ash.handlers.job_template import JobTemplateHandler
+from ash.handlers.job import JobHandler
+from ash.handlers.inventory import InventoryHandler
+from ash.handlers.project import ProjectHandler
 
 
 LIST_JOBS_COMMAND_LINE = "ls jobs project:demo nightly result_limit:5"
@@ -20,9 +26,15 @@ class BareAsh(Ash):
 class TestAshBehavior(unittest.TestCase):
     def setUp(self):
         self.ash = BareAsh()
-        self.ash.print = Mock()
+        self.ash.display = Mock()
         self.ash.commands = ROOT_COMMANDS.copy()
         self.ash.completer = None
+        self.ash._base_handler = BaseHandler(self.ash)
+        self.ash._root_handler = RootHandler(self.ash)
+        self.ash._jt_handler = JobTemplateHandler(self.ash)
+        self.ash._job_handler = JobHandler(self.ash)
+        self.ash._inventory_handler = InventoryHandler(self.ash)
+        self.ash._project_handler = ProjectHandler(self.ash)
 
     def test_run_dispatches_known_command_with_args(self):
         self.ash.session = Mock()
