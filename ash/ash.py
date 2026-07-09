@@ -88,6 +88,39 @@ class Ash(object):
             'inventory': self._base_handler.inventory,
         }
 
+    def _get_objects(self, object_type):
+        objects = self.cache.load_cache(object_type)
+        if objects:
+            print(f"Loaded {object_type} from cache, use 'cache' command to refresh.")
+        else:
+            print(f"Retrieving and caching {object_type}")
+            method = getattr(self.aap, f'get_{object_type}')
+            objects = method()
+            if not objects:
+                return [], [], []
+            for obj in objects:
+                self.cache.insert_cache(object_type, obj.id, obj)
+            print(f"{len(objects)} {object_type} cached.")
+
+        objects_by_id = {obj.id: obj for obj in objects}
+        objects_by_name = {obj.name: obj for obj in objects}
+
+        return objects, objects_by_id, objects_by_name
+
+    def _load_inventories_cache(self):
+        self.inventories, self.inventories_by_id, self.inventories_by_name = self._get_objects('inventories')
+
+    def _load_job_templates_cache(self):
+        self.job_templates, self.job_templates_by_id, self.job_templates_by_name = self._get_objects('job_templates')
+
+    def _load_projects_cache(self):
+        self.projects, self.projects_by_id, self.projects_by_name = self._get_objects('projects')
+
+    def _load_all_caches(self):
+        self._load_inventories_cache()
+        self._load_job_templates_cache()
+        self._load_projects_cache()
+
     def filter_objects(self, objects, args, filter_definitions):
         if args:
             for arg in [a.lower() for a in args]:
@@ -115,11 +148,17 @@ class Ash(object):
     # Context switching helpers (called by handlers)
     # ------------------------------------------------------------------ #
 
-    # Change directory command implementations
-    #
-    # Note: The CD commands will attempt to find the specified object by ID first, then by name (case-insensitive, partial match).
-    # If multiple matches are found by name, it will list the matches and ask the user to refine their input.
-    # The context is switched to the specified object and the available commands are updated accordingly.
+    def _get_commands_for_context(self, context_type):
+        if context_type == 'job_templates':
+            return OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        elif context_type == 'jobs':
+            return OrderedDict(list(JOB_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        elif context_type == 'inventories':
+            return OrderedDict(list(INVENTORY_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        elif context_type == 'projects':
+            return OrderedDict(list(PROJECT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        else:
+            return ROOT_COMMANDS.copy()
 
     def _switch_context(self, context, context_type):
         self.last_context = self.current_context
@@ -143,18 +182,6 @@ class Ash(object):
 
         self.commands = self._get_commands_for_context(context_type)
 
-    def _get_commands_for_context(self, context_type):
-        if context_type == 'job_templates':
-            return OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'jobs':
-            return OrderedDict(list(JOB_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'inventories':
-            return OrderedDict(list(INVENTORY_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'projects':
-            return OrderedDict(list(PROJECT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        else:
-            return ROOT_COMMANDS.copy()
-
     def _find_matching_objects(self, objects, identifier):
         matches = [obj for obj in objects if identifier.lower() in obj.name.lower()]
         exact_matches = [obj for obj in matches if identifier.lower() == obj.name.lower()]
@@ -168,6 +195,12 @@ class Ash(object):
                 selected_id = int(user_input.split(':', 1)[0])
                 return next((obj for obj in matches if obj.id == selected_id), None)
         return None
+
+    # Change directory command implementations
+    #
+    # Note: The CD commands will attempt to find the specified object by ID first, then by name (case-insensitive, partial match).
+    # If multiple matches are found by name, it will list the matches and ask the user to refine their input.
+    # The context is switched to the specified object and the available commands are updated accordingly.
 
     def _cd_job_template(self, args):
         identifier = ' '.join(args)
@@ -226,6 +259,8 @@ class Ash(object):
             return
         self._switch_context(proj, 'projects')
 
+    # Delegation aliases used by handlers/tests via the Ash surface.
+
     def _ask_variable(self, var):
         """Delegate to the base handler. Public alias so handlers and tests can reference it on Ash."""
         return self._base_handler._ask_variable(var)
@@ -233,39 +268,6 @@ class Ash(object):
     def _cmd_output(self, args):
         """Alias so handlers can call ash._cmd_output([]) without name-mangling."""
         self._job_handler.output(args)
-
-    def _get_objects(self, object_type):
-        objects = self.cache.load_cache(object_type)
-        if objects:
-            print(f"Loaded {object_type} from cache, use 'cache' command to refresh.")
-        else:
-            print(f"Retrieving and caching {object_type}")
-            method = getattr(self.aap, f'get_{object_type}')
-            objects = method()
-            if not objects:
-                return [], [], []
-            for obj in objects:
-                self.cache.insert_cache(object_type, obj.id, obj)
-            print(f"{len(objects)} {object_type} cached.")
-
-        objects_by_id = {obj.id: obj for obj in objects}
-        objects_by_name = {obj.name: obj for obj in objects}
-
-        return objects, objects_by_id, objects_by_name
-
-    def _load_inventories_cache(self):
-        self.inventories, self.inventories_by_id, self.inventories_by_name = self._get_objects('inventories')
-
-    def _load_job_templates_cache(self):
-        self.job_templates, self.job_templates_by_id, self.job_templates_by_name = self._get_objects('job_templates')
-
-    def _load_projects_cache(self):
-        self.projects, self.projects_by_id, self.projects_by_name = self._get_objects('projects')
-
-    def _load_all_caches(self):
-        self._load_inventories_cache()
-        self._load_job_templates_cache()
-        self._load_projects_cache()
 
     def get_prompt(self):
         prompt = []
