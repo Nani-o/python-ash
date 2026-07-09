@@ -9,7 +9,7 @@ class Cache(object):
         self.data_folder = Path.home().joinpath(".local", "share", "ash")
         self.aap_url = aap_url
         self.base64_encoded_aap_url = self.aap_url.encode('utf-8').hex()
-        self.user_version = 1
+        self.user_version = 2
         self.__init_db()
 
     def __init_db(self):
@@ -35,17 +35,15 @@ class Cache(object):
             self.__execute_sql(f'DROP TABLE IF EXISTS "{table[0]}"')
 
     def clean_cache(self, args=None):
-        if args:
-            if args == "job_templates":
-                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_job_templates"')
-            elif args == "projects":
-                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_projects"')
-            elif args == "inventories":
-                self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_inventories"')
-        else:
-            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_job_templates"')
-            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_projects"')
-            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_inventories"')
+        table_names = ["job_templates", "projects", "inventories"]
+
+        if args in table_names:
+            table_names = [args]
+        elif args:
+            return
+
+        for table_name in table_names:
+            self.__execute_sql(f'DELETE FROM "{self.base64_encoded_aap_url}_{table_name}"')
 
     def insert_cache(self, table_name, id, data):
         data_pickled = pickle.dumps(data)
