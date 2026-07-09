@@ -79,6 +79,27 @@ class BaseHandler:
     # Shared utilities
     # ------------------------------------------------------------------ #
 
+    # Input collection for launch variables
+
+    def _ask_variable(self, var):
+        ash = self.ash
+        ash.form = None
+
+        default, default_display, multiline = self._get_variable_defaults(var)
+        prompt = self._build_variable_prompt(var, default_display, multiline)
+
+        while True:
+            if var == "inventory":
+                user_input = self._prompt_inventory_variable(prompt, default, multiline)
+            else:
+                user_input = ash.session_wo_history.prompt(prompt, multiline=multiline, default=str(default))
+
+            is_valid, user_input = self._process_variable_input(var, user_input)
+            if is_valid:
+                return var, user_input
+
+            ash.display.print("Invalid input. Please try again.", 'yellow')
+
     def _multiple_choice_prompt(self, name, description, choices, default=None, required=False, multi=False):
         options = {"--layout=reverse"}
         height = len(choices) + 2
@@ -96,70 +117,6 @@ class BaseHandler:
                 choices = sorted(choices, key=lambda x: 0 if x == default else 1)
             user_input = iterfzf(choices, prompt=f"{name} ({description}) [{default}]: ", __extra__=options, multi=multi) or default
         return user_input
-
-    def _ask_variable(self, var):
-        ash = self.ash
-        user_input = None
-        default_display = None
-        multiline = False
-        ash.form = None
-
-        if var == "extra_vars":
-            multiline = True
-
-        if var == "credential":
-            credentials = ash.current_context.summary_fields.get('credentials', [])
-            default = ','.join([str(cred['id']) for cred in credentials])
-            default_display = ",".join([f"{cred['id']}:{cred['name']}" for cred in credentials])
-        elif var == "inventory":
-            inventory = ash.current_context.summary_fields.get('inventory', {})
-            default = inventory.get('id')
-            if default:
-                default_display = f"{default}:{inventory.get('name', '')}"
-        else:
-            default = getattr(ash.current_context, var, '')
-
-        if not default:
-            default = ''
-
-        if default_display:
-            prompt = f"{var} ({default_display}): "
-        else:
-            prompt = f"{var}: "
-
-        if multiline:
-            ash.display.print("(Multi-line input enabled. Use Meta+Enter or Escape followed by Enter to finish input)", 'yellow')
-            prompt += "\n"
-
-        if var == "inventory":
-            ash.form = "inventory_form"
-            while not user_input:
-                user_input = ash.session_wo_history.prompt(prompt, multiline=multiline, completer=ash.form_completer, default=str(default))
-                inventories = []
-                for inventory in user_input.split(','):
-                    if inventory:
-                        inventory = self._retrieve_inventory(inventory)
-                        if inventory:
-                            inventories.append(inventory.id)
-                        else:
-                            user_input = None
-                            break
-                user_input = inventories if len(inventories) > 1 else inventories[0] if inventories else None
-        else:
-            user_input = ash.session_wo_history.prompt(prompt, multiline=multiline, default=str(default))
-
-        if var == "credential" and isinstance(user_input, str):
-            user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
-        if var == "extra_vars":
-            try:
-                user_input = yaml.safe_load(user_input) if user_input else {}
-                if user_input is None:
-                    user_input = {}
-            except yaml.YAMLError as e:
-                ash.display.print(f"Error parsing YAML: {e}", 'red')
-                return
-
-        return var, user_input
 
     def _handle_survey(self, survey_spec):
         ash = self.ash
@@ -191,6 +148,86 @@ class BaseHandler:
 
         return extra_vars
 
+    # _ask_variable helpers
+
+    def _get_variable_defaults(self, var):
+        ash = self.ash
+        default_display = None
+        multiline = var == "extra_vars"
+
+        if var == "credential":
+            credentials = ash.current_context.summary_fields.get('credentials', [])
+            default = ','.join([str(cred['id']) for cred in credentials])
+            default_display = ",".join([f"{cred['id']}:{cred['name']}" for cred in credentials])
+        elif var == "inventory":
+            inventory = ash.current_context.summary_fields.get('inventory', {})
+            default = inventory.get('id')
+            if default:
+                default_display = f"{default}:{inventory.get('name', '')}"
+        else:
+            default = getattr(ash.current_context, var, '')
+
+        return default or '', default_display, multiline
+
+    def _build_variable_prompt(self, var, default_display, multiline):
+        ash = self.ash
+        if default_display:
+            prompt = f"{var} ({default_display}): "
+        else:
+            prompt = f"{var}: "
+
+        if multiline:
+            ash.display.print("(Multi-line input enabled. Use Meta+Enter or Escape followed by Enter to finish input)", 'yellow')
+            prompt += "\n"
+
+        return prompt
+
+    def _prompt_inventory_variable(self, prompt, default, multiline):
+        ash = self.ash
+        user_input = None
+        ash.form = "inventory_form"
+
+        while not user_input:
+            user_input = ash.session_wo_history.prompt(
+                prompt,
+                multiline=multiline,
+                completer=ash.form_completer,
+                default=str(default),
+            )
+            inventories = []
+            for inventory_ref in user_input.split(','):
+                if inventory_ref:
+                    inventory = self._retrieve_inventory(inventory_ref)
+                    if inventory:
+                        inventories.append(inventory.id)
+                    else:
+                        user_input = None
+                        break
+            user_input = inventories if len(inventories) > 1 else inventories[0] if inventories else None
+
+        return user_input
+
+    def _process_variable_input(self, var, user_input):
+        ash = self.ash
+
+        if var == "credential" and isinstance(user_input, str):
+            user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
+
+        if var == "extra_vars":
+            try:
+                user_input = yaml.safe_load(user_input) if user_input else {}
+                if user_input is None:
+                    user_input = {}
+            except yaml.YAMLError as e:
+                ash.display.print(f"Error parsing YAML: {e}", 'red')
+                return False, None
+
+        return True, user_input
+
+    # ------------------------------------------------------------------ #
+    # Inventory resolution helpers
+    # ------------------------------------------------------------------ #
+
     def _retrieve_inventory(self, reference):
         ash = self.ash
         inventory = None
@@ -210,6 +247,10 @@ class BaseHandler:
             if not inventory:
                 ash.display.print(f"Invalid inventory name {reference}. Please enter a valid inventory ID or name.", 'red')
         return inventory
+
+    # ------------------------------------------------------------------ #
+    # Job launch validation/execution helpers
+    # ------------------------------------------------------------------ #
 
     def _validate_payload(self, payload):
         ash = self.ash
