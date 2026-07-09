@@ -48,7 +48,7 @@ class BaseHandler:
                 subprocess.run("pbcopy", universal_newlines=True, input=url)
                 print(f"{url} copied to clipboard.")
             except Exception:
-                print("Unable to copy URL to clipboard. Please copy it manually : {url}")
+                print(f"Unable to copy URL to clipboard. Please copy it manually : {url}")
         else:
             print("Unable to get URL for the current context.", 'red')
 

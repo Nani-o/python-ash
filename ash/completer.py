@@ -23,6 +23,8 @@ class BaseCompleter(Completer):
 
 
 class AshCompleter(BaseCompleter):
+    def __init__(self, ash_instance):
+        self.ash = ash_instance
 
     def get_completions(self, document, complete_event):
         self.cur_text = document.text_before_cursor
