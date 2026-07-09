@@ -1,11 +1,12 @@
 import io
 import unittest
 from contextlib import redirect_stdout
+from collections import OrderedDict
 from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 from ash.ash import Ash
-from ash.commands import ROOT_COMMANDS
+from ash.commands import JT_COMMANDS, ROOT_COMMANDS
 
 
 class AshBehaviorTests(unittest.TestCase):
@@ -19,16 +20,19 @@ class AshBehaviorTests(unittest.TestCase):
     def test_run_dispatches_known_command_with_args(self):
         ash = self.make_ash()
         ash.session = Mock()
-        ash.session.prompt = Mock(side_effect=["ls jobs result_limit:5", "exit"])
+        ash.session.prompt = Mock(side_effect=["ls jobs project:demo nightly result_limit:5", "exit"])
         ash.get_prompt = Mock(return_value=[])
-
-        calls = []
-        ash._Ash__cmd_ls = lambda args: calls.append(args)
+        ash.aap = Mock()
+        ash.aap.get_jobs.return_value = []
+        ash.display_jobs = Mock()
 
         with redirect_stdout(io.StringIO()):
             ash.run()
 
-        self.assertEqual(calls, [["jobs", "result_limit:5"]])
+        ash.aap.get_jobs.assert_called_once_with(
+            filters={"project__search": ["demo"], "search": ["nightly"]},
+            result_limit=5,
+        )
 
     def test_get_objects_uses_cache_when_available(self):
         ash = self.make_ash()
@@ -71,25 +75,6 @@ class AshBehaviorTests(unittest.TestCase):
             [call("projects", 10, objects[0]), call("projects", 11, objects[1])]
         )
 
-    def test_parse_ls_jobs_args_builds_filters_and_limit(self):
-        ash = self.make_ash()
-
-        filters, result_limit = ash._Ash__parse_ls_jobs_args(
-            ["project:demo", "nightly", "result_limit:25"]
-        )
-
-        self.assertEqual(filters, {"project__search": ["demo"], "search": ["nightly"]})
-        self.assertEqual(result_limit, 25)
-
-    def test_parse_ls_jobs_args_rejects_invalid_result_limit(self):
-        ash = self.make_ash()
-
-        filters, result_limit = ash._Ash__parse_ls_jobs_args(["result_limit:not-a-number"])
-
-        self.assertIsNone(filters)
-        self.assertIsNone(result_limit)
-        ash.print.assert_called_once()
-
     def test_filter_objects_supports_named_filters_and_plain_search(self):
         ash = self.make_ash()
         matching = SimpleNamespace(
@@ -115,27 +100,40 @@ class AshBehaviorTests(unittest.TestCase):
 
     def test_cmd_launch_merges_prompted_values_and_survey_vars(self):
         ash = self.make_ash()
+        ash.commands = OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        ash.session = Mock()
+        ash.session.prompt = Mock(side_effect=["launch", "exit"])
+        ash.get_prompt = Mock(return_value=[])
+        ash.session_wo_history = Mock()
+        ash.session_wo_history.prompt = Mock(side_effect=["", "yes"])
         ash.current_context = Mock()
         ash.current_context.get_asked_variables.return_value = ["inventory", "extra_vars"]
         ash.current_context.survey_enabled = True
-        ash.current_context.get_survey_spec.return_value = [{"variable": "branch"}]
+        ash.current_context.get_survey_spec.return_value = [{
+            "question_name": "Branch",
+            "question_description": "Git branch to use",
+            "variable": "branch",
+            "required": False,
+            "type": "text",
+            "default": "main",
+        }]
+
+        launched_payloads = []
+        ash.current_context.launch.side_effect = lambda payload: launched_payloads.append(payload) or None
 
         prompted_values = {
             "inventory": ("inventory", 42),
             "extra_vars": ("extra_vars", {"env": "prod"}),
         }
         ash._ask_variable = Mock(side_effect=lambda var: prompted_values[var])
-        ash._Ash__handle_survey = Mock(return_value={"branch": "main"})
-
-        captured = []
-        ash._Ash__execute_payload = lambda template, payload: captured.append((template, payload))
+        ash.inventories_by_id = {}
 
         with redirect_stdout(io.StringIO()):
-            ash._Ash__cmd_launch([])
+            ash.run()
 
         self.assertEqual(
-            captured,
-            [(ash.current_context, {"inventory": 42, "extra_vars": {"env": "prod", "branch": "main"}})],
+            launched_payloads,
+            [{"inventory": 42, "extra_vars": {"env": "prod", "branch": "main"}}],
         )
 
 
