@@ -9,9 +9,17 @@ from ash.ash import Ash
 from ash.commands import JT_COMMANDS, ROOT_COMMANDS
 
 
+LS_JOBS_COMMAND = "ls jobs project:demo nightly result_limit:5"
+
+
+class BareAsh(Ash):
+    def __init__(self):
+        pass
+
+
 class AshBehaviorTests(unittest.TestCase):
     def make_ash(self):
-        ash = Ash.__new__(Ash)
+        ash = BareAsh()
         ash.print = Mock()
         ash.commands = ROOT_COMMANDS.copy()
         ash.completer = None
@@ -20,7 +28,7 @@ class AshBehaviorTests(unittest.TestCase):
     def test_run_dispatches_known_command_with_args(self):
         ash = self.make_ash()
         ash.session = Mock()
-        ash.session.prompt = Mock(side_effect=["ls jobs project:demo nightly result_limit:5", "exit"])
+        ash.session.prompt = Mock(side_effect=[LS_JOBS_COMMAND, "exit"])
         ash.get_prompt = Mock(return_value=[])
         ash.aap = Mock()
         ash.aap.get_jobs.return_value = []
@@ -119,7 +127,12 @@ class AshBehaviorTests(unittest.TestCase):
         }]
 
         launched_payloads = []
-        ash.current_context.launch.side_effect = lambda payload: launched_payloads.append(payload) or None
+
+        def capture_launch(payload):
+            launched_payloads.append(payload)
+            return None
+
+        ash.current_context.launch.side_effect = capture_launch
 
         prompted_values = {
             "inventory": ("inventory", 42),
