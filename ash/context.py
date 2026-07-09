@@ -4,6 +4,7 @@
 
 from collections import OrderedDict
 
+from .types import ContextType
 from .commands import (
     ROOT_COMMANDS,
     JT_COMMANDS,
@@ -12,12 +13,34 @@ from .commands import (
     PROJECT_COMMANDS,
 )
 
-# Maps context-type strings to the command set active in that context.
-_CONTEXT_COMMANDS = {
-    'job_templates': JT_COMMANDS,
-    'jobs': JOB_COMMANDS,
-    'inventories': INVENTORY_COMMANDS,
-    'projects': PROJECT_COMMANDS,
+
+# Per-context-type configuration: colour, human label, command set, and
+# the short token used in the prompt line.
+_CONTEXT_TYPE_CONFIG = {
+    ContextType.JOB_TEMPLATES: {
+        'color': 'cyan',
+        'label': 'Job Template',
+        'commands': JT_COMMANDS,
+        'prompt_label': 'JobTemplate',
+    },
+    ContextType.JOBS: {
+        'color': None,          # determined at runtime by job.status
+        'label': 'Job',
+        'commands': JOB_COMMANDS,
+        'prompt_label': 'Job',
+    },
+    ContextType.INVENTORIES: {
+        'color': 'green',
+        'label': 'Inventory',
+        'commands': INVENTORY_COMMANDS,
+        'prompt_label': 'Inventory',
+    },
+    ContextType.PROJECTS: {
+        'color': 'orange',
+        'label': 'Project',
+        'commands': PROJECT_COMMANDS,
+        'prompt_label': 'Project',
+    },
 }
 
 
@@ -31,38 +54,26 @@ class ContextMixin:
         self.current_context_type = context_type
 
         if context is not None:
-            if context_type != 'jobs':
+            if context_type != ContextType.JOBS:
                 context.refresh()
                 self.cache.insert_cache(context_type, context.id, context)
-            if context_type == 'job_templates':
-                self.print(
-                    f"Switched context to Job Template: ID={context.id}, Name={context.name}",
-                    'cyan'
-                )
-            elif context_type == 'jobs':
-                self.print(
-                    f"Switched context to Job: ID={context.id}, Name={context.name}",
-                    self.status_to_color(context.status)
-                )
-            elif context_type == 'inventories':
-                self.print(
-                    f"Switched context to Inventory: ID={context.id}, Name={context.name}",
-                    'green'
-                )
-            elif context_type == 'projects':
-                self.print(
-                    f"Switched context to Project: ID={context.id}, Name={context.name}",
-                    'orange'
-                )
+            cfg = _CONTEXT_TYPE_CONFIG[ContextType(context_type)]
+            color = cfg['color'] or self.status_to_color(context.status)
+            self.print(
+                f"Switched context to {cfg['label']}: ID={context.id}, Name={context.name}",
+                color
+            )
         else:
             self.print("Switched to root context", 'white')
 
         self.commands = self._get_commands_for_context(context_type)
 
     def _get_commands_for_context(self, context_type):
-        commands = _CONTEXT_COMMANDS.get(context_type)
-        if commands:
-            return OrderedDict(list(commands.items()) + list(ROOT_COMMANDS.items()))
+        if context_type is None:
+            return ROOT_COMMANDS.copy()
+        cfg = _CONTEXT_TYPE_CONFIG.get(ContextType(context_type))
+        if cfg:
+            return OrderedDict(list(cfg['commands'].items()) + list(ROOT_COMMANDS.items()))
         return ROOT_COMMANDS.copy()
 
     def get_prompt(self):
@@ -70,32 +81,21 @@ class ContextMixin:
         if self.api_description:
             prompt.append((f'class:{self.api_description_color}', f'[{self.api_description}] '))
         if self.current_context:
-            context_type = self.current_context_type
-            if context_type == 'job_templates':
-                label = (
-                    f"JobTemplate[{self.current_context.id}] - "
-                    f"{self.current_context.name} "
-                )
-                prompt.append(('class:cyan', label))
-            elif context_type == 'jobs':
-                color = self.status_to_color(self.current_context.status)
-                label = (
-                    f"Job[{self.current_context.id}] - "
-                    f"{self.current_context.name} - "
-                    f"{self.current_context.status} "
-                )
+            cfg = _CONTEXT_TYPE_CONFIG.get(ContextType(self.current_context_type))
+            if cfg:
+                if self.current_context_type == ContextType.JOBS:
+                    color = self.status_to_color(self.current_context.status)
+                    label = (
+                        f"Job[{self.current_context.id}] - "
+                        f"{self.current_context.name} - "
+                        f"{self.current_context.status} "
+                    )
+                else:
+                    color = cfg['color']
+                    label = (
+                        f"{cfg['prompt_label']}[{self.current_context.id}] - "
+                        f"{self.current_context.name} "
+                    )
                 prompt.append((f'class:{color}', label))
-            elif context_type == 'inventories':
-                label = (
-                    f"Inventory[{self.current_context.id}] - "
-                    f"{self.current_context.name} "
-                )
-                prompt.append(('class:green', label))
-            elif context_type == 'projects':
-                label = (
-                    f"Project[{self.current_context.id}] - "
-                    f"{self.current_context.name} "
-                )
-                prompt.append(('class:orange', label))
         prompt.append(('class:white', '> '))
         return prompt

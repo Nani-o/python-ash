@@ -7,7 +7,6 @@
 import time
 
 import requests
-from termcolor import colored
 
 
 class BaseObject:
@@ -27,10 +26,7 @@ class BaseObject:
         self.init_vars(response.json())
 
     def log_error(self, response):
-        if response is None:
-            print(colored("Error: No response from API", 'red'))
-        else:
-            print(colored(f"Error: {response.status_code} - {response.text}", 'red'))
+        self.api.log_error(response)
 
 
 class JobTemplate(BaseObject):
@@ -197,3 +193,14 @@ class Job(BaseObject):
             self.log_error(response)
             return False
         return True
+
+
+# Registry mapping API resource names to their model classes.
+# Used by API.instantiate_object to avoid if/elif chains.
+OBJECT_REGISTRY = {
+    "inventories": Inventory,
+    "projects": Project,
+    "job_templates": JobTemplate,
+    "jobs": Job,
+    "hosts": Host,
+}

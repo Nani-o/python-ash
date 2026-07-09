@@ -23,6 +23,7 @@ from .commands import (
     LS_PROJECTS_FILTERS,
     LS_INVENTORIES_FILTERS,
 )
+from .types import ContextType
 
 
 class CommandHandlersMixin:
@@ -157,7 +158,7 @@ class CommandHandlersMixin:
         if not jt:
             self.print(f"Job Template '{identifier}' not found.", 'red')
             return
-        self._switch_context(jt, 'job_templates')
+        self._switch_context(jt, ContextType.JOB_TEMPLATES)
 
     def _cd_job(self, args):
         identifier = ' '.join(args)
@@ -185,7 +186,7 @@ class CommandHandlersMixin:
         if not job:
             self.print(f"Job '{identifier}' not found.", 'red')
             return
-        self._switch_context(job, 'jobs')
+        self._switch_context(job, ContextType.JOBS)
 
     def _cd_inventory(self, args):
         identifier = ' '.join(args)
@@ -196,7 +197,7 @@ class CommandHandlersMixin:
         if not inv:
             self.print(f"Inventory '{identifier}' not found.", 'red')
             return
-        self._switch_context(inv, 'inventories')
+        self._switch_context(inv, ContextType.INVENTORIES)
 
     def _cd_project(self, args):
         identifier = ' '.join(args)
@@ -207,7 +208,7 @@ class CommandHandlersMixin:
         if not proj:
             self.print(f"Project '{identifier}' not found.", 'red')
             return
-        self._switch_context(proj, 'projects')
+        self._switch_context(proj, ContextType.PROJECTS)
 
     def _find_matching_objects(self, objects, identifier):
         matches = [obj for obj in objects if identifier.lower() in obj.name.lower()]
@@ -254,7 +255,7 @@ class CommandHandlersMixin:
 
     def _cmd_refresh(self, args):
         self.current_context.refresh()
-        if self.current_context_type != 'jobs':
+        if self.current_context_type != ContextType.JOBS:
             self.cache.insert_cache(
                 self.current_context_type, self.current_context.id, self.current_context
             )
@@ -359,7 +360,7 @@ class CommandHandlersMixin:
                 "switching context to the new job and displaying output...",
                 'yellow'
             )
-            self._switch_context(job, 'jobs')
+            self._switch_context(job, ContextType.JOBS)
             self._cmd_output([])
         else:
             self.print("Failed to relaunch the job.", 'red')
@@ -383,7 +384,7 @@ class CommandHandlersMixin:
         self._cd_inventory([str(self.current_context.inventory)])
 
     def _cmd_sync(self, args):
-        if self.current_context_type == 'job_templates':
+        if self.current_context_type == ContextType.JOB_TEMPLATES:
             project = self.projects_by_id.get(self.current_context.project)
         else:
             project = self.current_context
@@ -623,7 +624,7 @@ class CommandHandlersMixin:
                     "switching context to the new job and displaying output...",
                     'yellow'
                 )
-                self._switch_context(job, 'jobs')
+                self._switch_context(job, ContextType.JOBS)
                 self._cmd_output([])
 
     def _cmd_launch(self, args):

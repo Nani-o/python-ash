@@ -97,18 +97,9 @@ class API:
         return [self.instantiate_object(object_type, item) for item in data]
 
     def instantiate_object(self, object_type, data):
-        from .models import Inventory, Project, JobTemplate, Job, Host
-        if object_type == "inventories":
-            return Inventory(self, data)
-        if object_type == "projects":
-            return Project(self, data)
-        if object_type == "job_templates":
-            return JobTemplate(self, data)
-        if object_type == "jobs":
-            return Job(self, data)
-        if object_type == "hosts":
-            return Host(self, data)
-        return None
+        from .models import OBJECT_REGISTRY
+        cls = OBJECT_REGISTRY.get(object_type)
+        return cls(self, data) if cls else None
 
     def log_error(self, response):
         if response is None:

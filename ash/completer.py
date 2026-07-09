@@ -1,27 +1,27 @@
 #!/usr/bin/env python
 
-from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.completion import Completer, Completion
-
-import re
-import json
-import os
 
 from collections import OrderedDict
 
-class AshCompleter(Completer):
-    def __init__(self, ash_instance):
-        self.ash = ash_instance
+
+class BaseCompleter(Completer):
+    """Shared base for all ash completers."""
 
     def _match_input(self, input, struct):
         if isinstance(struct, dict):
-            result = OrderedDict(
-                (key, value) for key, value
-                in struct.items()
-                if key.startswith(input))
-        elif isinstance(struct, list) or isinstance(struct, set):
-            result = [x for x in struct if x.startswith(input)]
-        return result
+            return OrderedDict(
+                (key, value) for key, value in struct.items()
+                if key.startswith(input)
+            )
+        elif isinstance(struct, (list, set)):
+            return [x for x in struct if x.startswith(input)]
+        return []
+
+
+class AshCompleter(BaseCompleter):
+    def __init__(self, ash_instance):
+        self.ash = ash_instance
 
     def get_completions(self, document, complete_event):
         self.cur_text = document.text_before_cursor
@@ -42,7 +42,7 @@ class AshCompleter(Completer):
                 elif len(self.word_list) >= 3:
                     subcommand = self.word_list[1]
                     if subcommand in self.ash.ls_commands_filters:
-                        filters = {key + ':': value for key,value in self.ash.ls_commands_filters[subcommand].items()}
+                        filters = {key + ':': value for key, value in self.ash.ls_commands_filters[subcommand].items()}
                         self.completions = self._match_input(
                             self.cur_word,
                             filters
@@ -57,22 +57,13 @@ class AshCompleter(Completer):
                     subcommand = self.word_list[1]
                     if subcommand == "project":
                         project_names = list(self.ash.projects_by_name.keys())
-                        self.completions = self._match_input(
-                            self.cur_word,
-                            project_names
-                        )
+                        self.completions = self._match_input(self.cur_word, project_names)
                     elif subcommand == "inventory":
                         inventory_names = list(self.ash.inventories_by_name.keys())
-                        self.completions = self._match_input(
-                            self.cur_word,
-                            inventory_names
-                        )
+                        self.completions = self._match_input(self.cur_word, inventory_names)
                     elif subcommand == "job_template":
                         jt_names = list(self.ash.job_templates_by_name.keys())
-                        self.completions = self._match_input(
-                            self.cur_word,
-                            jt_names
-                        )
+                        self.completions = self._match_input(self.cur_word, jt_names)
             elif command == "cache":
                 self.completions = self._match_input(
                     self.cur_word,
@@ -92,22 +83,12 @@ class AshCompleter(Completer):
                 meta = self.completions[word]
             else:
                 meta = None
-
             yield Completion(word, -len(self.cur_word), display_meta=meta)
 
-class FormCompleter(Completer):
+
+class FormCompleter(BaseCompleter):
     def __init__(self, ash_instance):
         self.ash = ash_instance
-
-    def _match_input(self, input, struct):
-        if isinstance(struct, dict):
-            result = OrderedDict(
-                (key, value) for key, value
-                in struct.items()
-                if key.startswith(input))
-        elif isinstance(struct, list) or isinstance(struct, set):
-            result = [x for x in struct if x.startswith(input)]
-        return result
 
     def get_completions(self, document, complete_event):
         self.cur_text = document.text_before_cursor
@@ -118,10 +99,7 @@ class FormCompleter(Completer):
         if len(self.word_list) == 1:
             if self.ash.form == "inventory_form":
                 inventory_names = list(self.ash.inventories_by_name.keys())
-                self.completions = self._match_input(
-                    self.cur_word,
-                    inventory_names
-                )
+                self.completions = self._match_input(self.cur_word, inventory_names)
 
         for word in self.completions:
             yield Completion(word, -len(self.cur_word))
