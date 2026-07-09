@@ -5,7 +5,6 @@
 import time
 
 import requests
-from termcolor import colored
 
 
 class BaseObject():
@@ -24,12 +23,6 @@ class BaseObject():
         if response is None or response.status_code != 200:
             return
         self.init_vars(response.json())
-
-    def log_error(self, response):
-        if response is None:
-            print(colored("Error: No response from API", 'red'))
-        else:
-            print(colored(f"Error: {response.status_code} - {response.text}", 'red'))
 
 
 class JobTemplate(BaseObject):
@@ -63,6 +56,7 @@ class JobTemplate(BaseObject):
             return []
         response = self.api.get_request(f"{self.uri}/survey_spec/")
         if response is None or response.status_code != 200:
+            self.api.log_error(response)
             return []
         survey_spec = response.json()
         return survey_spec.get('spec', [])
@@ -72,7 +66,10 @@ class JobTemplate(BaseObject):
             payload = {}
 
         response = self.api.post_request(f"{self.uri}/launch/", payload)
-        return Job(self.api, response.json()) if response and response.status_code == 201 else None
+        if response is None or response.status_code != 201:
+            self.api.log_error(response)
+            return None
+        return Job(self.api, response.json())
 
 
 class Inventory(BaseObject):
@@ -97,6 +94,8 @@ class Inventory(BaseObject):
                 # "variables": "string"
             }
             result = self.api.post_request(f"{self.uri}/hosts/", payload)
+            if result is None or result.status_code != 201:
+                self.api.log_error(result)
             results[host] = result
         return results
 
@@ -107,8 +106,11 @@ class Inventory(BaseObject):
             result = self.api.get_request(f"hosts/{host.id}/")
             if result is not None and result.status_code == 200:
                 delete_result = self.api.delete_request(f"hosts/{host.id}")
+                if delete_result is None or delete_result.status_code not in (200, 202, 204):
+                    self.api.log_error(delete_result)
                 results[host.name] = delete_result
             else:
+                self.api.log_error(result)
                 results[host.name] = result
         return results
 
@@ -135,7 +137,7 @@ class Project(BaseObject):
     def sync(self):
         response = self.api.post_request(f"{self.uri}/update/", {})
         if response is None or response.status_code != 202:
-            self.log_error(response)
+            self.api.log_error(response)
             return False
         return True
 
@@ -178,11 +180,14 @@ class Job(BaseObject):
 
     def relaunch(self):
         response = self.api.post_request(f"{self.uri}/relaunch/", {})
-        return Job(self.api, response.json()) if response and response.status_code == 201 else None
+        if response is None or response.status_code != 201:
+            self.api.log_error(response)
+            return None
+        return Job(self.api, response.json())
 
     def cancel(self):
         response = self.api.post_request(f"{self.uri}/cancel/", {})
         if response is None or response.status_code != 202:
-            self.log_error(response)
+            self.api.log_error(response)
             return False
         return True
