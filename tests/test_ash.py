@@ -107,7 +107,9 @@ class AshBehaviorTests(unittest.TestCase):
             },
         )
 
-        result = ash.filter_objects([matching, other], ["project:core", "deploy"], {"project": ""})
+        filter_definitions = {"project": "Filter by project"}
+
+        result = ash.filter_objects([matching, other], ["project:core", "deploy"], filter_definitions)
 
         self.assertEqual(result, [matching])
 
@@ -128,7 +130,8 @@ class AshBehaviorTests(unittest.TestCase):
         captured = []
         ash._Ash__execute_payload = lambda template, payload: captured.append((template, payload))
 
-        ash._Ash__cmd_launch([])
+        with redirect_stdout(io.StringIO()):
+            ash._Ash__cmd_launch([])
 
         self.assertEqual(
             captured,
