@@ -1,31 +1,36 @@
 #!/usr/bin/env python
 
+"""The Ash shell: REPL loop and initialization."""
+
 from collections import OrderedDict
-import time
-import sys
-from prompt_toolkit import PromptSession
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import FormattedText
-from prompt_toolkit.history import FileHistory
-from prompt_toolkit.lexers import PygmentsLexer
-from prompt_toolkit.styles import Style
 from os.path import expanduser
-from os import get_terminal_size
-from iterfzf import iterfzf
 
-import json
-import re
-import yaml
-import webbrowser
-import dateutil.parser
-import subprocess
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style
 
-from .aap import AAP, API, Inventory, JobTemplate, Project, Job
-from .completer import AshCompleter, FormCompleter
-from .commands import ROOT_COMMANDS, CD_COMMANDS, LS_COMMANDS, LS_JOB_TEMPLATE_FILTERS, LS_JOBS_FILTERS, LS_PROJECTS_FILTERS, LS_INVENTORIES_FILTERS, JT_COMMANDS, JOB_COMMANDS, INVENTORY_COMMANDS, PROJECT_COMMANDS
+from .api import API
+from .aap import AAP
+from .commands import (
+    ROOT_COMMANDS, CD_COMMANDS, LS_COMMANDS,
+    LS_JOB_TEMPLATE_FILTERS, LS_JOBS_FILTERS,
+    LS_PROJECTS_FILTERS, LS_INVENTORIES_FILTERS,
+)
 from .colors import COLORS
+from .completer import AshCompleter, FormCompleter
+from .display import DisplayMixin
+from .context import ContextMixin
+from .handlers import CommandHandlersMixin
 
-class Ash(object):
+
+class Ash(DisplayMixin, ContextMixin, CommandHandlersMixin):
+    """The main Ash shell class.
+
+    Initialises all state, then drives the interactive REPL.  All command
+    handlers live in CommandHandlersMixin, display helpers in DisplayMixin,
+    and context management in ContextMixin.
+    """
+
     def __init__(self, config, cache):
         self.commands = ROOT_COMMANDS
         self.cd_commands = CD_COMMANDS
@@ -34,9 +39,9 @@ class Ash(object):
             'job_templates': LS_JOB_TEMPLATE_FILTERS,
             'jobs': LS_JOBS_FILTERS,
             'projects': LS_PROJECTS_FILTERS,
-            'inventories': LS_INVENTORIES_FILTERS
+            'inventories': LS_INVENTORIES_FILTERS,
         }
-        self.job_template_commands = JT_COMMANDS
+
         if getattr(config, 'api_path', None):
             api_path = config.api_path
         else:
@@ -47,28 +52,35 @@ class Ash(object):
         self.aap = AAP(self.api)
         self.cache = cache
         self._load_all_caches()
+
         self.current_context = None
         self.current_context_type = None
         self.last_context = None
         self.last_context_type = None
+        self.form = None
+
         self.colors = COLORS
+        self.style = Style.from_dict(self.colors)
+
         history_file_path = expanduser("~/.ash_history")
         self.history = FileHistory(history_file_path)
         self.completer = AshCompleter(self)
         self.form_completer = FormCompleter(self)
-        self.style = Style.from_dict(self.colors)
         self.session = PromptSession(history=self.history, style=self.style)
         self.session_wo_history = PromptSession(style=self.style)
 
     def filter_objects(self, objects, args, filter_definitions):
         if args:
             for arg in [a.lower() for a in args]:
-                filter = [filter for filter in filter_definitions.keys() if arg.startswith(filter + ':')]
+                filter = [f for f in filter_definitions.keys() if arg.startswith(f + ':')]
                 if filter:
                     filter_key = filter[0]
                     filter_value = arg.split(':', 1)[1].strip()
                     if not filter_value:
-                        self.print(f"Invalid filter format: '{arg}'. Expected format is 'filter:value'.", 'red')
+                        self.print(
+                            f"Invalid filter format: '{arg}'. Expected format is 'filter:value'.",
+                            'red'
+                        )
                         return []
                     objects = [
                         obj for obj in objects
@@ -80,647 +92,7 @@ class Ash(object):
                     ]
                 else:
                     objects = [obj for obj in objects if arg in obj.name.lower()]
-
         return objects
-
-    def print(self, message, class_name=None, attrs=None, end='\n'):
-        if class_name:
-            print_formatted_text(FormattedText([(f'class:{class_name}', message)]), style=self.style, end=end)
-        else:
-            print(message, end=end)
-
-    def object_to_color(self, obj):
-        if isinstance(obj, JobTemplate):
-            return 'cyan'
-        elif isinstance(obj, Inventory):
-            return 'green'
-        elif isinstance(obj, Project):
-            return 'orange'
-        elif isinstance(obj, Job):
-            return self.status_to_color(obj.status)
-        else:
-            return 'white'
-
-    def status_to_color(self, status):
-        if status == 'successful':
-            return 'blue'
-        elif status in ['failed', 'error']:
-            return 'red'
-        elif status == 'canceled':
-            return 'magenta'
-        elif status in ['pending', 'waiting', 'running']:
-            return 'yellow'
-        else:
-            return 'white'
-
-    def parse_label(self, label, max_length=None):
-        # if string is ISO datetime, parse and format it
-        if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?", label):
-           try:
-                dt = dateutil.parser.isoparse(label)
-                label = dt.astimezone().strftime('%d/%m-%H:%M')
-           except (ValueError, TypeError):
-                pass
-        if max_length is None or len(label) <= max_length:
-            return label
-        else:
-            return label[:max_length-3] + '...'
-
-    def display_jobs(self, jobs):
-        self.display_by_columns(jobs, ['id', 'created', 'limit', 'name', 'playbook', 'scm_branch', 'status'])
-
-    def display_job_templates(self, job_templates):
-        self.display_by_columns(job_templates, ['id', 'name', 'playbook'])
-
-    def display_inventories(self, inventories):
-        self.display_by_columns(inventories, ['id', 'name', 'total_hosts'])
-
-    def display_projects(self, projects):
-        self.display_by_columns(projects, ['id', 'name', 'scm_url'])
-
-    def display_by_columns(self, objects, columns):
-        column_widths = {}
-        for col in columns:
-            if col in ['created', 'modified', 'finished']:
-                max_len = 11
-            else:
-                max_len = max([len(str(getattr(obj, col))) for obj in objects] + [len(col)])
-            if col == 'limit' and max_len > 30:
-                max_len = 30
-            elif col == 'scm_branch' and max_len > 25:
-                max_len = 25
-            column_widths[col] = max_len
-
-        format_str = "   ".join([f"{{:<{column_widths[col]}}}" for col in columns])
-        header = format_str.format(*[col for col in columns])
-        self.print(header, 'headers')
-        for obj in objects:
-            message = format_str.format(*[self.parse_label(str(getattr(obj, col)), column_widths[col]) for col in columns])
-            color = self.object_to_color(obj)
-            self.print(message, color + '_bold')
-
-    # List command implementations
-    def __cmd_ls(self, args):
-        if len(args) == 0:
-            print("Usage: ls <object_type>")
-            return
-
-        object_type = args[0]
-
-        if object_type not in LS_COMMANDS.keys():
-            print(f"Unknown object type: {object_type}")
-            return
-
-        method = getattr(self, f'_Ash__ls_{object_type}', None)
-        method(args[1:])
-
-    def __ls_job_templates(self, args):
-        if not self.job_templates:
-            print("No job templates in cache. Try using 'cache' command.")
-            return
-
-        job_templates = self.filter_objects(self.job_templates, args, LS_JOB_TEMPLATE_FILTERS)
-        self.display_job_templates(job_templates)
-
-    def __cmd_watch(self, args):
-        while True:
-            result_limit = get_terminal_size().lines - 2
-            filters = self.__parse_ls_jobs_args(args)[0]
-            jobs = self.aap.get_jobs(filters=filters, result_limit=result_limit)
-            # Move cursor to the beginning of the first line and clear to the end of the screen
-            sys.stdout.write('\033[H')  # Move cursor to the top-left corner
-            sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
-            sys.stdout.flush()
-            if jobs:
-                self.display_jobs(jobs)
-            time.sleep(5)
-
-    def __parse_ls_jobs_args(self, args):
-        result_limit = 100
-        filters = {}
-        for arg in [a.lower() for a in args]:
-            if ':' in arg and arg.split(':', 1)[0] in LS_JOBS_FILTERS.keys():
-                filter_key, filter_value = arg.split(':', 1)
-                if filter_key == 'result_limit':
-                    try:
-                        filter_value = int(filter_value)
-                    except ValueError:
-                        self.print("Invalid result_limit value. It should be an integer.", 'red')
-                        return None, None
-                    result_limit = filter_value
-                    continue
-                filter_key = f"{filter_key}__search"
-            else:
-                filter_key = "search"
-                filter_value = arg
-
-            if filter_key in filters:
-                filters[filter_key].append(filter_value)
-            else:
-                filters[filter_key] = [filter_value]
-        return filters, result_limit
-
-    def __ls_jobs(self, args):
-        filters, result_limit = self.__parse_ls_jobs_args(args)
-        jobs = self.aap.get_jobs(filters=filters, result_limit=result_limit)
-        if jobs:
-            self.display_jobs(jobs)
-        else:
-            print("No jobs found.")
-
-    def __ls_inventories(self, args):
-        if not self.inventories:
-            print("No inventories in cache. Try using 'cache' command.")
-            return
-
-        inventories = self.filter_objects(self.inventories, args, LS_INVENTORIES_FILTERS)
-        self.display_inventories(inventories)
-
-    def __ls_projects(self, args):
-        if not self.projects:
-            print("No projects in cache. Try using 'cache' command.")
-            return
-
-        projects = self.filter_objects(self.projects, args, LS_PROJECTS_FILTERS)
-        self.display_projects(projects)
-
-    # Change directory command implementations
-    #
-    # Note: The CD commands will attempt to find the specified object by ID first, then by name (case-insensitive, partial match).
-    # If multiple matches are found by name, it will list the matches and ask the user to refine their input.
-    # The context is switched to the specified object and the available commands are updated accordingly.
-
-    def __switch_context(self, context, context_type):
-        self.last_context = self.current_context
-        self.last_context_type = self.current_context_type
-        self.current_context = context
-        self.current_context_type = context_type
-        if self.current_context is not None:
-            if self.current_context_type != 'jobs':
-                self.current_context.refresh()
-                self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
-            if context_type == 'job_templates':
-                self.print(f"Switched context to Job Template: ID={context.id}, Name={context.name}", 'cyan')
-            elif context_type == 'jobs':
-                self.print(f"Switched context to Job: ID={context.id}, Name={context.name}", self.status_to_color(context.status))
-            elif context_type == 'inventories':
-                self.print(f"Switched context to Inventory: ID={context.id}, Name={context.name}", 'green')
-            elif context_type == 'projects':
-                self.print(f"Switched context to Project: ID={context.id}, Name={context.name}", 'orange')
-        else:
-            self.print("Switched to root context", 'white')
-
-        self.commands = self.__get_commands_for_context(context_type)
-
-
-    def __get_commands_for_context(self, context_type):
-        if context_type == 'job_templates':
-            return OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'jobs':
-            return OrderedDict(list(JOB_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'inventories':
-            return OrderedDict(list(INVENTORY_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'projects':
-            return OrderedDict(list(PROJECT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        else:
-            return ROOT_COMMANDS.copy()
-
-    def __cmd_cd(self, args):
-        if len(args) == 0:
-            self.__switch_context(None, None)
-            return
-        elif len(args) < 2:
-            if args[0] == '-':
-                if self.last_context:
-                    self.__switch_context(self.last_context, self.last_context_type)
-                else:
-                    self.print("No previous context to switch back to.", 'red')
-            else:
-                self.print("Usage: cd <object_type> <name_or_id>", 'red')
-            return
-
-        object_type = args[0]
-
-        if object_type not in CD_COMMANDS.keys():
-            self.print(f"Unknown object type: {object_type}", 'red')
-            return
-
-        method = getattr(self, f'_Ash__cd_{object_type}', None)
-        method(args[1:])
-
-    def __cd_job_template(self, args):
-        identifier = ' '.join(args)
-        jt = None
-        if identifier.isdigit():
-            jt = self.job_templates_by_id.get(int(identifier))
-        else:
-            jt = self.__find_matching_objects(self.job_templates, identifier)
-
-        if not jt:
-            self.print(f"Job Template '{identifier}' not found.", 'red')
-            return
-        self.__switch_context(jt, 'job_templates')
-
-    def __cd_job(self, args):
-        identifier = ' '.join(args)
-        job = None
-        if identifier.isdigit():
-            job = self.aap.get_job(int(identifier))
-        else:
-            jobs = list(reversed(self.aap.get_jobs(filters={'search': identifier}, result_limit=100)))
-            if jobs:
-                jobs_list = ["{}: {} - {:<15} {} {}".format(job.id, job.name, self.parse_label(job.limit, 15), job.status, self.parse_label(job.created)) for job in jobs]
-                job = self.__multiple_choice_prompt("Job", f"Multiple jobs found matching '{identifier}'. Please select one:", jobs_list, required=True)
-                if job:
-                    job_id = int(job.split(':', 1)[0])
-                    job = next((j for j in jobs if j.id == job_id), None)
-        if not job:
-            self.print(f"Job '{identifier}' not found.", 'red')
-            return
-        self.__switch_context(job, 'jobs')
-
-    def __cd_inventory(self, args):
-        identifier = ' '.join(args)
-        inv = None
-        if identifier.isdigit():
-            inv = self.inventories_by_id.get(int(identifier))
-        else:
-            inv = self.__find_matching_objects(self.inventories, identifier)
-
-        if not inv:
-            self.print(f"Inventory '{identifier}' not found.", 'red')
-            return
-        self.__switch_context(inv, 'inventories')
-
-    def __cd_project(self, args):
-        identifier = ' '.join(args)
-        proj = None
-        if identifier.isdigit():
-            proj = self.projects_by_id.get(int(identifier))
-        else:
-            proj = self.__find_matching_objects(self.projects, identifier)
-
-        if not proj:
-            self.print(f"Project '{identifier}' not found.", 'red')
-            return
-        self.__switch_context(proj, 'projects')
-
-    def __find_matching_objects(self, objects, identifier):
-        matches = [obj for obj in objects if identifier.lower() in obj.name.lower()]
-        exact_matches = [obj for obj in matches if identifier.lower() == obj.name.lower()]
-        if len(exact_matches) == 1:
-            return exact_matches[0]
-        elif len(matches) == 1:
-            return matches[0]
-        elif len(matches) > 1:
-            user_input = self.__multiple_choice_prompt("Multiple matches found", f"Multiple objects found matching '{identifier}'. Please select one:", [f"{obj.id}: {obj.name}" for obj in matches], required=True)
-            if user_input:
-                selected_id = int(user_input.split(':', 1)[0])
-                return next((obj for obj in matches if obj.id == selected_id), None)
-        return None
-
-    # Refresh commands implementation
-    #
-    # The 'cache' command will clear the local cache and re-fetch all inventories, projects, and job templates from the API.
-    # The 'refresh' command will refresh the current context, which is useful for updating the details of the current object
-    # without refreshing the entire cache.
-    #
-
-    def __cmd_cache(self, args):
-        if args:
-            if args[0] not in ['inventories', 'projects', 'job_templates']:
-                print(f"Unknown cache type: {args[0]}. Valid types are: inventories, projects, job_templates.")
-                return
-            self.cache.clean_cache(args[0])
-            method = getattr(self, f'_load_{args[0]}_cache', None)
-            method()
-        else:
-            self.cache.clean_cache()
-            self._load_all_caches()
-        print("Cache refreshed.")
-
-    def __cmd_refresh(self, args):
-        self.current_context.refresh()
-        if self.current_context_type != 'jobs':
-            self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
-        print("Context refreshed.")
-
-    def __cmd_url(self, args):
-        url = self.current_context.absolute_url
-        if url:
-            try:
-                subprocess.run("pbcopy", universal_newlines=True, input=url)
-                print(f"{url} copied to clipboard.")
-            except Exception:
-                print("Unable to copy URL to clipboard. Please copy it manually : {url}")
-        else:
-            print("Unable to get URL for the current context.", 'red')
-
-    def __cmd_open(self, args):
-        url = self.current_context.absolute_url
-        if url:
-            webbrowser.open(url)
-            print(f"Opened {url} in your browser.")
-        else:
-            print("Unable to get URL for the current context.", 'red')
-
-    def __cmd_info(self, args):
-        info = {}
-        if args:
-            for arg in args:
-                info[arg] = self.current_context.data.get(arg, None)
-        else:
-            info = self.current_context.data
-        print(json.dumps(info, indent=4))
-
-    def __cmd_jobs(self, args):
-        jobs = self.current_context.jobs()
-        if jobs:
-            self.display_jobs(jobs)
-        else:
-            print("No jobs found for this job template.")
-
-    def __cmd_hosts(self, args):
-        hosts = self.current_context.get_hosts()
-        if hosts:
-            for host in hosts:
-                print(f"{host.id}: {host.name}")
-        else:
-            print("No hosts found in this inventory.")
-
-    def __cmd_add_hosts(self, args):
-        self.print("(Multi-line input enabled. Use Meta+Enter or Escape followed by Enter to finish input)", 'yellow')
-        prompt = "Hosts to add (one per line):"
-        prompt += "\n"
-
-        user_input = self.session_wo_history.prompt(prompt, multiline=True)
-        results = self.current_context.add_hosts(user_input.splitlines())
-
-        for host, result in results.items():
-            if result is not None:
-                if result.status_code in [201]:
-                    self.print(f"{host}: Host added successfully.", 'green')
-                elif result.status_code == 400:
-                    self.print(f"{host}: {result.json().get('__all__', ['Unknown error'])[0]}", 'red')
-                else:
-                    self.print(f"{host}: Failed to add host. Status code: {result.status_code}", 'red')
-
-    def __cmd_clear_hosts(self, args):
-        confirmation = self.session_wo_history.prompt("Are you sure you want to delete all hosts from this inventory? This action cannot be undone. [no]: ", multiline=False) or "no"
-        if confirmation.lower() in ['yes', 'y']:
-            results = self.current_context.clear_hosts()
-            for host, result in results.items():
-                if result is not None:
-                    if result.status_code in [204]:
-                        self.print(f"{host}: Host deleted successfully.", 'green')
-                    else:
-                        self.print(f"{host}: Failed to delete host. Status code: {result.status_code}", 'red')
-        else:
-            self.print("Operation cancelled.", 'yellow')
-
-    def __cmd_relaunch(self, args):
-        job = self.current_context.relaunch()
-        if job:
-            self.print(f"Relaunched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
-            self.__switch_context(job, 'jobs')
-            self.__cmd_output([])
-        else:
-            self.print("Failed to relaunch the job.", 'red')
-
-    def __cmd_cancel(self, args):
-        if self.current_context.cancel():
-            self.print(f"Cancelled job with ID: {self.current_context.id}", 'yellow')
-        else:
-            self.print("Failed to cancel the job.", 'red')
-
-    def __cmd_output(self, args):
-        output = self.current_context.print_stdout()
-
-    def __multiple_choice_prompt(self, name, description, choices, default=None, required=False, multi=False):
-        options = {"--layout=reverse"}
-        height = len(choices) + 2
-        user_input = None
-        if multi:
-            options.add(f"--header=Select one or more options using tab/shift+tab and press Enter when done.")
-            height += 1
-        options.add(f"--height={height}")
-        if required and not default:
-            while not user_input:
-                user_input = iterfzf(choices, prompt=f"{name} ({description}) [required]: ", __extra__=options, multi=multi)
-        else:
-            # Reorder the list so that the default value(s) appear at the top
-            if default and not multi:
-                choices = sorted(choices, key=lambda x: 0 if x == default else 1)
-            user_input = iterfzf(choices, prompt=f"{name} ({description}) [{default}]: ", __extra__=options, multi=multi) or default
-        return user_input
-
-    def __handle_survey(self, survey_spec):
-        extra_vars = {}
-        for question in survey_spec:
-            default = question.get('default', '')
-            name = question['question_name']
-            description = question['question_description']
-            variable = question['variable']
-            required = question['required']
-            type = question['type']
-
-            user_input = None
-            if type == 'text':
-                if required and not default:
-                    while not user_input:
-                        user_input = self.session_wo_history.prompt(f"{name} ({description}) [required]: ", multiline=False)
-                else:
-                    user_input = self.session_wo_history.prompt(f"{name} ({description}) [{default}]: ", multiline=False) or default
-            elif type == 'multiplechoice':
-                choices = question.get('choices', [])
-                user_input = self.__multiple_choice_prompt(name, description, choices, default=default, required=required)
-            elif type == 'multiselect':
-                choices = question.get('choices', [])
-                user_input = self.__multiple_choice_prompt(name, description, choices, default=default, required=required, multi=True)
-
-            print(f"Set variable '{variable}' to '{user_input}'")
-            extra_vars[variable] = user_input
-
-        return extra_vars
-
-
-    def _ask_variable(self, var):
-        user_input = None
-        default_display = None
-        multiline = False
-        self.form = None
-
-        if var == "extra_vars":
-            multiline = True
-
-        if var == "credential":
-            credentials = self.current_context.summary_fields.get('credentials', [])
-            default = ','.join([str(cred['id']) for cred in credentials])
-            default_display = ",".join([f"{cred['id']}:{cred['name']}" for cred in credentials])
-        elif var == "inventory":
-            inventory = self.current_context.summary_fields.get('inventory', {})
-            default = inventory.get('id')
-            if default:
-                default_display = f"{default}:{inventory.get('name', '')}"
-        else:
-            default = getattr(self.current_context, var, '')
-
-        if not default:
-            default = ''
-
-        if default_display:
-            prompt = f"{var} ({default_display}): "
-        else:
-            prompt = f"{var}: "
-
-        if multiline:
-            self.print("(Multi-line input enabled. Use Meta+Enter or Escape followed by Enter to finish input)", 'yellow')
-            prompt += "\n"
-
-        if var == "inventory":
-            self.form = "inventory_form"
-            while not user_input:
-                user_input = self.session_wo_history.prompt(prompt, multiline=multiline, completer=self.form_completer, default=str(default))
-                inventories = []
-                for inventory in user_input.split(','):
-                    if inventory:
-                        inventory = self.__retrieve_inventory(inventory)
-                        if inventory:
-                            inventories.append(inventory.id)
-                        else:
-                            user_input = None
-                            break
-            user_input = inventories if len(inventories) > 1 else inventories[0] if inventories else None
-        else:
-            user_input = self.session_wo_history.prompt(prompt, multiline=multiline, default=str(default))
-
-        if var == "credential" and isinstance(user_input, str):
-            user_input = [int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()]
-        if var == "extra_vars":
-            try:
-                user_input = yaml.safe_load(user_input) if user_input else {}
-                if user_input == None:
-                    user_input = {}
-            except yaml.YAMLError as e:
-                self.print(f"Error parsing YAML: {e}", 'red')
-                return
-
-        return var, user_input
-
-    def __retrieve_inventory(self, reference):
-        if reference.isdigit():
-            inventory = self.inventories_by_id.get(int(reference))
-            if not inventory:
-                inventory = self.aap.get_inventory(int(reference))  # Attempt to fetch from API if not in cache
-                if inventory:
-                    self.inventories.append(inventory)
-                    self.inventories_by_id[int(reference)] = inventory
-                    self.inventories_by_name[inventory.name] = inventory
-                    self.cache.insert_cache('inventories', inventory.id, inventory)
-                else:
-                    self.print(f"Invalid inventory ID {reference}. Please enter a valid inventory ID or name.", 'red')
-        else:
-            inventory = self.inventories_by_name.get(reference)
-            if not inventory:
-                self.print(f"Invalid inventory name {reference}. Please enter a valid inventory ID or name.", 'red')
-
-        return inventory
-
-    def __validate_payload(self, payload):
-        self.print(f"Final payload for launching the job:\n {json.dumps(payload, indent=4)}", 'green_bold')
-        if isinstance(payload.get('inventory'), list):
-            inventory_names = [self.inventories_by_id.get(inv_id).name for inv_id in payload['inventory'] if self.inventories_by_id.get(inv_id)]
-            self.print(f"You specified multiple inventories, jobs will be launched sequentially for each inventory: {', '.join(inventory_names)}", 'yellow_bold')
-        user_input = self.session_wo_history.prompt(f"Are you sure you want to launch this job template with the above parameters? [no]: ", multiline=False)or "no"
-        return user_input.lower()
-
-    def __execute_payload(self, template, payload):
-        if not self.__validate_payload(payload) in ['yes', 'y']:
-            self.print("Job launch cancelled.", 'red_bold')
-            return
-
-        if isinstance(payload.get('inventory'), list):
-            inventory_ids = payload.pop('inventory')
-            for inv_id in inventory_ids:
-                payload_copy = payload.copy()
-                payload_copy['inventory'] = inv_id
-                job = template.launch(payload_copy)
-                if job:
-                    self.print(f"Launched job with ID: {job.id} for inventory ID: {inv_id}", 'yellow')
-                    while job.status in ['pending', 'waiting', 'running']:
-                        self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} is currently {job.status}. Elapsed time: {str(job.elapsed)}", self.status_to_color(job.status), end='')
-                        job.refresh()
-                        time.sleep(5)
-                        sys.stdout.write('\r')      # Move cursor to the beginning of the line
-                        sys.stdout.write('\033[K')  # Clear to the end of the line
-                    self.print(f"Job with ID: {job.id} for inventory ID: {inv_id} finished with status: {job.status}. Total elapsed time: {str(job.elapsed)}", self.status_to_color(job.status))
-        else:
-            job = template.launch(payload)
-
-            if job:
-                self.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
-                self.__switch_context(job, 'jobs')
-                self.__cmd_output([])
-
-
-    def __cmd_launch(self, args):
-        payload = {}
-
-        for var in self.current_context.get_asked_variables():
-            key, user_input = self._ask_variable(var)
-            payload[key] = user_input
-
-        if self.current_context.survey_enabled:
-            extra_vars = self.__handle_survey(self.current_context.get_survey_spec())
-            print(f"Extra vars from survey: {extra_vars}")
-
-            if 'extra_vars' in payload and isinstance(payload['extra_vars'], dict):
-                payload['extra_vars'] = {**payload['extra_vars'], **extra_vars}
-            elif extra_vars:
-                payload['extra_vars'] = extra_vars
-
-        self.__execute_payload(self.current_context, payload)
-
-    def __cmd_reuse(self, args):
-        payload = {}
-        job = self.current_context
-
-        template = self.job_templates_by_id.get(job.job_template)
-        if not template:
-            self.print("Original job template not found in cache. Cannot reuse the job.", 'red')
-            return
-
-        for var in template.get_asked_variables():
-            if var in ['inventory', 'limit', 'job_tags', 'skip_tags']:
-                key, user_input = self._ask_variable(var)
-                payload[key] = user_input
-            elif var == 'credential':
-                payload['credential'] = [cred['id'] for cred in job.summary_fields.get('credentials', [])]
-            elif var == 'variables':
-                pass
-            else:
-                payload[var] = getattr(job, var, None)
-
-        payload['extra_vars'] = json.loads(job.extra_vars) if job.extra_vars else {}
-
-        self.__execute_payload(template, payload)
-
-    def __cmd_sync(self, args):
-        if self.current_context_type == 'job_templates':
-            project = self.projects_by_id.get(self.current_context.project)
-        else:
-            project = self.current_context
-        project.sync()
-        print(f"Project '{project.name}' sync initiated.")
-
-    def __cmd_template(self, args):
-        self.__cd_job_template([str(self.current_context.job_template)])
-
-    def __cmd_project(self, args):
-        self.__cd_project([str(self.current_context.project)])
-
-    def __cmd_inventory(self, args):
-        self.__cd_inventory([str(self.current_context.inventory)])
 
     def _get_objects(self, object_type):
         objects = self.cache.load_cache(object_type)
@@ -731,58 +103,45 @@ class Ash(object):
             method = getattr(self.aap, f'get_{object_type}')
             objects = method()
             if not objects:
-                return [], [], []
+                return [], {}, {}
             for obj in objects:
                 self.cache.insert_cache(object_type, obj.id, obj)
             print(f"{len(objects)} {object_type} cached.")
 
         objects_by_id = {obj.id: obj for obj in objects}
         objects_by_name = {obj.name: obj for obj in objects}
-
         return objects, objects_by_id, objects_by_name
 
     def _load_inventories_cache(self):
-        self.inventories, self.inventories_by_id, self.inventories_by_name = self._get_objects('inventories')
+        self.inventories, self.inventories_by_id, self.inventories_by_name = (
+            self._get_objects('inventories')
+        )
 
     def _load_job_templates_cache(self):
-        self.job_templates, self.job_templates_by_id, self.job_templates_by_name = self._get_objects('job_templates')
+        self.job_templates, self.job_templates_by_id, self.job_templates_by_name = (
+            self._get_objects('job_templates')
+        )
 
     def _load_projects_cache(self):
-        self.projects, self.projects_by_id, self.projects_by_name = self._get_objects('projects')
+        self.projects, self.projects_by_id, self.projects_by_name = (
+            self._get_objects('projects')
+        )
 
     def _load_all_caches(self):
         self._load_inventories_cache()
         self._load_job_templates_cache()
         self._load_projects_cache()
 
-    def get_prompt(self):
-        prompt = []
-        prompt.append(('class:white', 'ash '))
-        if self.api_description:
-            prompt.append((f'class:{self.api_description_color}', f'[{self.api_description}] '))
-        if self.current_context:
-            if isinstance(self.current_context, JobTemplate):
-                prompt.append(('class:cyan', f'JobTemplate[{self.current_context.id}] - {self.current_context.name} '))
-            elif isinstance(self.current_context, Inventory):
-                prompt.append(('class:green', f'Inventory[{self.current_context.id}] - {self.current_context.name} '))
-            elif isinstance(self.current_context, Project):
-                prompt.append(('class:orange', f'Project[{self.current_context.id}] - {self.current_context.name} '))
-            elif isinstance(self.current_context, Job):
-                color = self.status_to_color(self.current_context.status)
-                prompt.append((f'class:{color}', f'Job[{self.current_context.id}] - {self.current_context.name} - {self.current_context.status} '))
-
-        prompt.append(('class:white', '> '))
-        return prompt
-
     def run(self):
         while True:
             try:
-                text = self.session.prompt(self.get_prompt(), completer=self.completer, multiline=False)
-                # text = self.session.prompt(self.get_prompt(), refresh_interval=0.5, reserve_space_for_menu=0)
+                text = self.session.prompt(
+                    self.get_prompt(), completer=self.completer, multiline=False
+                )
             except KeyboardInterrupt:
-                continue  # Control-C pressed. Try again.
+                continue
             except EOFError:
-                break  # Control-D pressed.
+                break
 
             arr = text.strip().split(' ')
             command, args = arr[0], arr[1:]
@@ -790,16 +149,17 @@ class Ash(object):
             if command == 'exit':
                 break
             elif command in self.commands:
-                method = getattr(self, f'_Ash__cmd_{command}')
+                method = getattr(self, f'_cmd_{command}', None)
                 if method:
                     try:
                         method(args)
                     except KeyboardInterrupt:
                         self.print("\nCommand interrupted by user.", 'red')
                 else:
-                    print('Command not implemented: {}'.format(command))
+                    print(f'Command not implemented: {command}')
             elif command == '':
                 continue
             else:
-                print('Unknown command: {}'.format(command))
+                print(f'Unknown command: {command}')
+
         print('[ash is terminating]')
