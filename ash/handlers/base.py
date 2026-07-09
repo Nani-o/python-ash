@@ -22,6 +22,21 @@ class BaseHandler:
     # Shared commands (available in all context-specific command sets)
     # ------------------------------------------------------------------ #
 
+    def sync(self, args):
+        if self.ash.current_context_type == 'job_templates':
+            self.ash._jt_handler.sync(args)
+        else:
+            self.ash._project_handler.sync(args)
+
+    def project(self, args):
+        if self.ash.current_context_type == 'jobs':
+            self.ash._job_handler.project(args)
+        else:
+            self.ash._jt_handler.project(args)
+
+    def inventory(self, args):
+        self.ash._job_handler.inventory(args)
+
     def info(self, args):
         info = {}
         if args:

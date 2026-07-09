@@ -60,6 +60,33 @@ class Ash(object):
         self._job_handler = JobHandler(self)
         self._inventory_handler = InventoryHandler(self)
         self._project_handler = ProjectHandler(self)
+        self._command_handlers = self._build_command_handlers()
+
+    def _build_command_handlers(self):
+        """Return explicit command-to-method mapping used by the command loop."""
+        return {
+            'ls': self._root_handler.ls,
+            'watch': self._root_handler.watch,
+            'cd': self._root_handler.cd,
+            'cache': self._root_handler.cache,
+            'refresh': self._base_handler.refresh,
+            'url': self._base_handler.url,
+            'open': self._base_handler.open,
+            'info': self._base_handler.info,
+            'launch': self._jt_handler.launch,
+            'jobs': self._jt_handler.jobs,
+            'relaunch': self._job_handler.relaunch,
+            'reuse': self._job_handler.reuse,
+            'cancel': self._job_handler.cancel,
+            'output': self._job_handler.output,
+            'template': self._job_handler.template,
+            'hosts': self._inventory_handler.hosts,
+            'add_hosts': self._inventory_handler.add_hosts,
+            'clear_hosts': self._inventory_handler.clear_hosts,
+            'sync': self._base_handler.sync,
+            'project': self._base_handler.project,
+            'inventory': self._base_handler.inventory,
+        }
 
     def filter_objects(self, objects, args, filter_definitions):
         if args:
@@ -83,99 +110,6 @@ class Ash(object):
                     objects = [obj for obj in objects if arg in obj.name.lower()]
 
         return objects
-
-    # ------------------------------------------------------------------ #
-    # Root command wrappers — delegate to RootHandler
-    # ------------------------------------------------------------------ #
-
-    def __cmd_ls(self, args):
-        self._root_handler.ls(args)
-
-    def __cmd_watch(self, args):
-        self._root_handler.watch(args)
-
-    def __cmd_cd(self, args):
-        self._root_handler.cd(args)
-
-    def __cmd_cache(self, args):
-        self._root_handler.cache(args)
-
-    # ------------------------------------------------------------------ #
-    # Shared context command wrappers — delegate to BaseHandler
-    # ------------------------------------------------------------------ #
-
-    def __cmd_refresh(self, args):
-        self._base_handler.refresh(args)
-
-    def __cmd_url(self, args):
-        self._base_handler.url(args)
-
-    def __cmd_open(self, args):
-        self._base_handler.open(args)
-
-    def __cmd_info(self, args):
-        self._base_handler.info(args)
-
-    # ------------------------------------------------------------------ #
-    # Job template context command wrappers — delegate to JobTemplateHandler
-    # ------------------------------------------------------------------ #
-
-    def __cmd_launch(self, args):
-        self._jt_handler.launch(args)
-
-    def __cmd_jobs(self, args):
-        self._jt_handler.jobs(args)
-
-    # ------------------------------------------------------------------ #
-    # Job context command wrappers — delegate to JobHandler
-    # ------------------------------------------------------------------ #
-
-    def __cmd_relaunch(self, args):
-        self._job_handler.relaunch(args)
-
-    def __cmd_reuse(self, args):
-        self._job_handler.reuse(args)
-
-    def __cmd_cancel(self, args):
-        self._job_handler.cancel(args)
-
-    def __cmd_output(self, args):
-        self._job_handler.output(args)
-
-    def __cmd_template(self, args):
-        self._job_handler.template(args)
-
-    # ------------------------------------------------------------------ #
-    # Inventory context command wrappers — delegate to InventoryHandler
-    # ------------------------------------------------------------------ #
-
-    def __cmd_hosts(self, args):
-        self._inventory_handler.hosts(args)
-
-    def __cmd_add_hosts(self, args):
-        self._inventory_handler.add_hosts(args)
-
-    def __cmd_clear_hosts(self, args):
-        self._inventory_handler.clear_hosts(args)
-
-    # ------------------------------------------------------------------ #
-    # Commands shared across context types
-    # ------------------------------------------------------------------ #
-
-    def __cmd_sync(self, args):
-        if self.current_context_type == 'job_templates':
-            self._jt_handler.sync(args)
-        else:
-            self._project_handler.sync(args)
-
-    def __cmd_project(self, args):
-        if self.current_context_type == 'jobs':
-            self._job_handler.project(args)
-        else:
-            self._jt_handler.project(args)
-
-    def __cmd_inventory(self, args):
-        self._job_handler.inventory(args)
 
     # ------------------------------------------------------------------ #
     # Context switching helpers (called by handlers)
@@ -368,7 +302,7 @@ class Ash(object):
             if command == 'exit':
                 break
             elif command in self.commands:
-                method = getattr(self, f'_Ash__cmd_{command}')
+                method = self._command_handlers.get(command)
                 if method:
                     try:
                         method(args)
