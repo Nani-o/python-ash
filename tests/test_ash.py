@@ -108,7 +108,7 @@ class AshBehaviorTests(unittest.TestCase):
 
     def test_cmd_launch_merges_prompted_values_and_survey_vars(self):
         ash = self.make_ash()
-        ash.commands = OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
+        ash.commands = OrderedDict({**JT_COMMANDS, **ROOT_COMMANDS})
         ash.session = Mock()
         ash.session.prompt = Mock(side_effect=["launch", "exit"])
         ash.get_prompt = Mock(return_value=[])
@@ -130,7 +130,6 @@ class AshBehaviorTests(unittest.TestCase):
 
         def capture_launch(payload):
             launched_payloads.append(payload)
-            return None
 
         ash.current_context.launch.side_effect = capture_launch
 
