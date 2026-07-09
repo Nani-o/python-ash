@@ -12,6 +12,14 @@ from .commands import (
     PROJECT_COMMANDS,
 )
 
+# Maps context-type strings to the command set active in that context.
+_CONTEXT_COMMANDS = {
+    'job_templates': JT_COMMANDS,
+    'jobs': JOB_COMMANDS,
+    'inventories': INVENTORY_COMMANDS,
+    'projects': PROJECT_COMMANDS,
+}
+
 
 class ContextMixin:
     """Mixin that manages the current context and prompt for the Ash shell."""
@@ -52,16 +60,10 @@ class ContextMixin:
         self.commands = self._get_commands_for_context(context_type)
 
     def _get_commands_for_context(self, context_type):
-        if context_type == 'job_templates':
-            return OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'jobs':
-            return OrderedDict(list(JOB_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'inventories':
-            return OrderedDict(list(INVENTORY_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'projects':
-            return OrderedDict(list(PROJECT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        else:
-            return ROOT_COMMANDS.copy()
+        commands = _CONTEXT_COMMANDS.get(context_type)
+        if commands:
+            return OrderedDict(list(commands.items()) + list(ROOT_COMMANDS.items()))
+        return ROOT_COMMANDS.copy()
 
     def get_prompt(self):
         prompt = [('class:white', 'ash ')]

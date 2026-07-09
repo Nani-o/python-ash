@@ -69,6 +69,32 @@ class Ash(DisplayMixin, ContextMixin, CommandHandlersMixin):
         self.session = PromptSession(history=self.history, style=self.style)
         self.session_wo_history = PromptSession(style=self.style)
 
+        # Build a flat dispatch table for all known commands so the REPL
+        # never uses fragile getattr name-mangling.
+        self._command_dispatch = {
+            'ls': self._cmd_ls,
+            'cd': self._cmd_cd,
+            'watch': self._cmd_watch,
+            'cache': self._cmd_cache,
+            'refresh': self._cmd_refresh,
+            'url': self._cmd_url,
+            'open': self._cmd_open,
+            'info': self._cmd_info,
+            'jobs': self._cmd_jobs,
+            'launch': self._cmd_launch,
+            'sync': self._cmd_sync,
+            'template': self._cmd_template,
+            'project': self._cmd_project,
+            'inventory': self._cmd_inventory,
+            'hosts': self._cmd_hosts,
+            'add_hosts': self._cmd_add_hosts,
+            'clear_hosts': self._cmd_clear_hosts,
+            'relaunch': self._cmd_relaunch,
+            'cancel': self._cmd_cancel,
+            'output': self._cmd_output,
+            'reuse': self._cmd_reuse,
+        }
+
     def filter_objects(self, objects, args, filter_definitions):
         if args:
             for arg in [a.lower() for a in args]:
@@ -148,17 +174,17 @@ class Ash(DisplayMixin, ContextMixin, CommandHandlersMixin):
 
             if command == 'exit':
                 break
-            elif command in self.commands:
-                method = getattr(self, f'_cmd_{command}', None)
-                if method:
+            if command == '':
+                continue
+            if command in self.commands:
+                handler = self._command_dispatch.get(command)
+                if handler:
                     try:
-                        method(args)
+                        handler(args)
                     except KeyboardInterrupt:
                         self.print("\nCommand interrupted by user.", 'red')
                 else:
                     print(f'Command not implemented: {command}')
-            elif command == '':
-                continue
             else:
                 print(f'Unknown command: {command}')
 

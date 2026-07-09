@@ -11,6 +11,26 @@ from prompt_toolkit.formatted_text import FormattedText
 from .models import JobTemplate, Inventory, Project, Job
 
 
+# Maps job status values to their display colour.
+_STATUS_COLORS = {
+    'successful': 'blue',
+    'failed': 'red',
+    'error': 'red',
+    'canceled': 'magenta',
+    'pending': 'yellow',
+    'waiting': 'yellow',
+    'running': 'yellow',
+}
+
+# Maps model class to a fixed display colour; Job uses status_to_color instead.
+_OBJECT_TYPE_COLORS = {
+    JobTemplate: 'cyan',
+    Inventory: 'green',
+    Project: 'orange',
+    Job: None,
+}
+
+
 _ISO_DATETIME_RE = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
     r"(\.[0-9]+)?([Zz]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?"
@@ -30,28 +50,13 @@ class DisplayMixin:
             print(message, end=end)
 
     def status_to_color(self, status):
-        if status == 'successful':
-            return 'blue'
-        elif status in ['failed', 'error']:
-            return 'red'
-        elif status == 'canceled':
-            return 'magenta'
-        elif status in ['pending', 'waiting', 'running']:
-            return 'yellow'
-        else:
-            return 'white'
+        return _STATUS_COLORS.get(status, 'white')
 
     def object_to_color(self, obj):
-        if isinstance(obj, JobTemplate):
-            return 'cyan'
-        elif isinstance(obj, Inventory):
-            return 'green'
-        elif isinstance(obj, Project):
-            return 'orange'
-        elif isinstance(obj, Job):
-            return self.status_to_color(obj.status)
-        else:
-            return 'white'
+        for cls, color in _OBJECT_TYPE_COLORS.items():
+            if isinstance(obj, cls):
+                return color if color is not None else self.status_to_color(obj.status)
+        return 'white'
 
     def parse_label(self, label, max_length=None):
         if _ISO_DATETIME_RE.match(label):

@@ -40,9 +40,13 @@ class CommandHandlersMixin:
         if object_type not in LS_COMMANDS:
             print(f"Unknown object type: {object_type}")
             return
-        method = getattr(self, f'_ls_{object_type}', None)
-        if method:
-            method(args[1:])
+        ls_dispatch = {
+            'job_templates': self._ls_job_templates,
+            'jobs': self._ls_jobs,
+            'inventories': self._ls_inventories,
+            'projects': self._ls_projects,
+        }
+        ls_dispatch[object_type](args[1:])
 
     def _ls_job_templates(self, args):
         if not self.job_templates:
@@ -136,9 +140,13 @@ class CommandHandlersMixin:
             self.print(f"Unknown object type: {object_type}", 'red')
             return
 
-        method = getattr(self, f'_cd_{object_type}', None)
-        if method:
-            method(args[1:])
+        cd_dispatch = {
+            'job_template': self._cd_job_template,
+            'inventory': self._cd_inventory,
+            'project': self._cd_project,
+            'job': self._cd_job,
+        }
+        cd_dispatch[object_type](args[1:])
 
     def _cd_job_template(self, args):
         identifier = ' '.join(args)
@@ -225,17 +233,20 @@ class CommandHandlersMixin:
     # ------------------------------------------------------------------
 
     def _cmd_cache(self, args):
+        cache_loaders = {
+            'inventories': self._load_inventories_cache,
+            'projects': self._load_projects_cache,
+            'job_templates': self._load_job_templates_cache,
+        }
         if args:
-            if args[0] not in ['inventories', 'projects', 'job_templates']:
+            if args[0] not in cache_loaders:
                 print(
                     f"Unknown cache type: {args[0]}. "
-                    "Valid types are: inventories, projects, job_templates."
+                    f"Valid types are: {', '.join(cache_loaders.keys())}."
                 )
                 return
             self.cache.clean_cache(args[0])
-            method = getattr(self, f'_load_{args[0]}_cache', None)
-            if method:
-                method()
+            cache_loaders[args[0]]()
         else:
             self.cache.clean_cache()
             self._load_all_caches()
