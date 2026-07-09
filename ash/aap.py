@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
-"""Service layer for AAP - thin wrapper around the HTTP API."""
+"""High-level service class for the Ansible Automation Platform."""
 
-from .api import API
 from .models import Inventory, Project, JobTemplate, Job
 
 
@@ -42,7 +41,8 @@ class AAP:
 
     def get_jobs(self, filters=None, result_limit=50):
         jobs = self.api.retrieves_objects(
-            "jobs", result_limit=result_limit, order_by="-finished", filters=filters
+            "jobs", result_limit=result_limit,
+            order_by="-finished", filters=filters
         )
         if jobs:
             jobs = list(reversed(jobs))

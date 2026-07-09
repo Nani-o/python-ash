@@ -42,10 +42,7 @@ class Ash(DisplayMixin, ContextMixin, CommandHandlersMixin):
             'inventories': LS_INVENTORIES_FILTERS,
         }
 
-        if getattr(config, 'api_path', None):
-            api_path = config.api_path
-        else:
-            api_path = "/api/controller/v2/"
+        api_path = getattr(config, 'api_path', None) or "/api/controller/v2/"
         self.api = API(config.base_url, config.token, api_path)
         self.api_description = getattr(config, 'description', None)
         self.api_description_color = getattr(config, 'description_color', 'white')
@@ -96,28 +93,28 @@ class Ash(DisplayMixin, ContextMixin, CommandHandlersMixin):
         }
 
     def filter_objects(self, objects, args, filter_definitions):
-        if args:
-            for arg in [a.lower() for a in args]:
-                filter = [f for f in filter_definitions.keys() if arg.startswith(f + ':')]
-                if filter:
-                    filter_key = filter[0]
-                    filter_value = arg.split(':', 1)[1].strip()
-                    if not filter_value:
-                        self.print(
-                            f"Invalid filter format: '{arg}'. Expected format is 'filter:value'.",
-                            'red'
-                        )
-                        return []
-                    objects = [
-                        obj for obj in objects
-                        if filter_value.lower()
-                        in obj.data["summary_fields"].get(filter_key, {}).get('name', '').lower()
-                        or filter_value.lower()
-                        in obj.data["summary_fields"].get(filter_key, {}).get('username', '').lower()
-                        or filter_value.lower() in str(obj.data.get(filter_key, '')).lower()
-                    ]
-                else:
-                    objects = [obj for obj in objects if arg in obj.name.lower()]
+        if not args:
+            return objects
+        for arg in [a.lower() for a in args]:
+            matched_filter = next(
+                (f for f in filter_definitions if arg.startswith(f + ':')), None
+            )
+            if matched_filter:
+                filter_value = arg.split(':', 1)[1].strip()
+                if not filter_value:
+                    self.print(
+                        f"Invalid filter format: '{arg}'. Expected format is 'filter:value'.",
+                        'red'
+                    )
+                    return []
+                objects = [
+                    obj for obj in objects
+                    if filter_value in obj.data["summary_fields"].get(matched_filter, {}).get('name', '').lower()
+                    or filter_value in obj.data["summary_fields"].get(matched_filter, {}).get('username', '').lower()
+                    or filter_value in str(obj.data.get(matched_filter, '')).lower()
+                ]
+            else:
+                objects = [obj for obj in objects if arg in obj.name.lower()]
         return objects
 
     def _get_objects(self, object_type):

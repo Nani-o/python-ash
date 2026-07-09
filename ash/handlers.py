@@ -25,6 +25,10 @@ from .commands import (
 )
 from .types import ContextType
 
+# Variables from a previous job that the user should be prompted to re-enter
+# when reusing a job (rather than being silently copied from the old job).
+_REUSE_PROMPT_VARS = frozenset(('inventory', 'limit', 'job_tags', 'skip_tags'))
+
 
 class CommandHandlersMixin:
     """Mixin that implements all interactive commands for the Ash shell."""
@@ -461,82 +465,81 @@ class CommandHandlersMixin:
 
         return extra_vars
 
-    def _ask_variable(self, var):
-        user_input = None
-        default_display = None
-        multiline = False
-        self.form = None
+    # --- per-variable-type ask helpers ---
 
-        if var == "extra_vars":
-            multiline = True
-
-        if var == "credential":
-            credentials = self.current_context.summary_fields.get('credentials', [])
-            default = ','.join([str(cred['id']) for cred in credentials])
-            default_display = ",".join([f"{cred['id']}:{cred['name']}" for cred in credentials])
-        elif var == "inventory":
-            inventory = self.current_context.summary_fields.get('inventory', {})
-            default = inventory.get('id')
-            if default:
-                default_display = f"{default}:{inventory.get('name', '')}"
-        else:
-            default = getattr(self.current_context, var, '')
-
-        if not default:
-            default = ''
-
-        if default_display:
-            prompt = f"{var} ({default_display}): "
-        else:
-            prompt = f"{var}: "
-
-        if multiline:
-            self.print(
-                "(Multi-line input enabled. Use Meta+Enter or Escape followed by Enter to finish input)",
-                'yellow'
-            )
-            prompt += "\n"
-
-        if var == "inventory":
-            self.form = "inventory_form"
-            while not user_input:
-                user_input = self.session_wo_history.prompt(
-                    prompt, multiline=multiline,
-                    completer=self.form_completer, default=str(default)
-                )
-                inventories = []
-                for inventory in user_input.split(','):
-                    if inventory:
-                        inventory = self._retrieve_inventory(inventory)
-                        if inventory:
-                            inventories.append(inventory.id)
-                        else:
-                            user_input = None
-                            break
-            user_input = (
-                inventories if len(inventories) > 1
-                else inventories[0] if inventories
-                else None
-            )
-        else:
-            user_input = self.session_wo_history.prompt(
-                prompt, multiline=multiline, default=str(default)
-            )
-
-        if var == "credential" and isinstance(user_input, str):
+    def _ask_credential_var(self):
+        var = 'credential'
+        credentials = self.current_context.summary_fields.get('credentials', [])
+        default = ','.join([str(cred['id']) for cred in credentials])
+        default_display = ",".join([f"{cred['id']}:{cred['name']}" for cred in credentials])
+        prompt = f"{var} ({default_display}): " if default_display else f"{var}: "
+        user_input = self.session_wo_history.prompt(prompt, multiline=False, default=str(default))
+        if isinstance(user_input, str):
             user_input = [
                 int(cred.strip()) for cred in user_input.split(',') if cred.strip().isdigit()
             ]
-        if var == "extra_vars":
-            try:
-                user_input = yaml.safe_load(user_input) if user_input else {}
-                if user_input is None:
-                    user_input = {}
-            except yaml.YAMLError as e:
-                self.print(f"Error parsing YAML: {e}", 'red')
-                return None
-
         return var, user_input
+
+    def _ask_inventory_var(self):
+        var = 'inventory'
+        self.form = "inventory_form"
+        inventory = self.current_context.summary_fields.get('inventory', {})
+        default = inventory.get('id', '')
+        default_display = f"{default}:{inventory.get('name', '')}" if default else None
+        prompt = f"{var} ({default_display}): " if default_display else f"{var}: "
+        if not default:
+            default = ''
+        user_input = None
+        while not user_input:
+            user_input = self.session_wo_history.prompt(
+                prompt, multiline=False,
+                completer=self.form_completer, default=str(default)
+            )
+            inventories = []
+            for inv_ref in user_input.split(','):
+                if inv_ref:
+                    inv_obj = self._retrieve_inventory(inv_ref)
+                    if inv_obj:
+                        inventories.append(inv_obj.id)
+                    else:
+                        user_input = None
+                        break
+        result = inventories if len(inventories) > 1 else (inventories[0] if inventories else None)
+        return var, result
+
+    def _ask_extra_vars_var(self):
+        var = 'extra_vars'
+        default = getattr(self.current_context, var, '') or ''
+        self.print(
+            "(Multi-line input enabled. Use Meta+Enter or Escape followed by Enter to finish input)",
+            'yellow'
+        )
+        user_input = self.session_wo_history.prompt(f"{var}: \n", multiline=True, default=str(default))
+        try:
+            user_input = yaml.safe_load(user_input) if user_input else {}
+            if user_input is None:
+                user_input = {}
+        except yaml.YAMLError as e:
+            self.print(f"Error parsing YAML: {e}", 'red')
+            return None
+        return var, user_input
+
+    def _ask_simple_var(self, var):
+        default = getattr(self.current_context, var, '') or ''
+        user_input = self.session_wo_history.prompt(f"{var}: ", multiline=False, default=str(default))
+        return var, user_input
+
+    def _ask_variable(self, var):
+        self.form = None
+        var_handlers = {
+            'inventory': self._ask_inventory_var,
+            'credential': self._ask_credential_var,
+            'extra_vars': self._ask_extra_vars_var,
+        }
+        handler = var_handlers.get(var)
+        if handler:
+            return handler()
+        return self._ask_simple_var(var)
 
     def _retrieve_inventory(self, reference):
         if reference.isdigit():
@@ -656,7 +659,7 @@ class CommandHandlersMixin:
             return
 
         for var in template.get_asked_variables():
-            if var in ('inventory', 'limit', 'job_tags', 'skip_tags'):
+            if var in _REUSE_PROMPT_VARS:
                 result = self._ask_variable(var)
                 if result is None:
                     return
