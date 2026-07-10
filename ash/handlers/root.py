@@ -48,6 +48,8 @@ class RootHandler(BaseHandler):
     def _ls_jobs(self, args):
         ash = self.ash
         filters, result_limit = self._parse_ls_jobs_args(args)
+        if filters is None and result_limit is None:
+            return
         jobs = ash.aap.get_jobs(filters=filters, result_limit=result_limit)
         if jobs:
             ash.display.display_jobs(jobs)
@@ -106,7 +108,9 @@ class RootHandler(BaseHandler):
         ash = self.ash
         while True:
             result_limit = get_terminal_size().lines - 2
-            filters = self._parse_ls_jobs_args(args)[0]
+            filters, _ = self._parse_ls_jobs_args(args)
+            if filters is None:
+                return
             jobs = ash.aap.get_jobs(filters=filters, result_limit=result_limit)
             # Move cursor to the beginning of the first line and clear to the end of the screen
             sys.stdout.write('\033[H')  # Move cursor to the top-left corner
