@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import re
 
 def read(f):
@@ -26,7 +26,7 @@ setup(name='ash',
     author = 'Sofiane Medjkoune',
     author_email = 'sofiane@medjkoune.fr',
     license = 'MIT',
-    packages = ['ash'],
+    packages = find_packages(include=['ash', 'ash.*']),
     install_requires = [line.strip() for line in open('requirements.txt') if line.strip() and not line.startswith('#')],
     entry_points = {
         'console_scripts': ['ash=ash.main:main'],
