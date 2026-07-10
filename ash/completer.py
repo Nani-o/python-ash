@@ -8,6 +8,7 @@ import json
 import os
 
 from collections import OrderedDict
+from .object_types import JOB_TEMPLATES, JOBS, INVENTORIES, PROJECTS
 
 
 class BaseCompleter(Completer):
@@ -50,6 +51,13 @@ class AshCompleter(BaseCompleter):
                             self.cur_word,
                             filters
                         )
+            elif command == "watch":
+                if len(self.word_list) >= 2:
+                    filters = {key + ':': value for key,value in self.ash.ls_commands_filters[JOBS].items()}
+                    self.completions = self._match_input(
+                        self.cur_word,
+                        filters
+                    )
             elif command == "cd":
                 if len(self.word_list) == 2:
                     self.completions = self._match_input(
