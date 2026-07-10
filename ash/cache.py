@@ -4,6 +4,8 @@ import sqlite3
 import pickle
 from pathlib import Path
 
+from .object_types import CACHED_OBJECT_TYPES
+
 class Cache(object):
     def __init__(self, aap_url):
         self.data_folder = Path.home().joinpath(".local", "share", "ash")
@@ -19,9 +21,8 @@ class Cache(object):
             self._drop_all_tables()
             self.__execute_sql(f'PRAGMA user_version = {self.user_version}')
 
-        self._create_table('job_templates')
-        self._create_table('projects')
-        self._create_table('inventories')
+        for table_name in CACHED_OBJECT_TYPES:
+            self._create_table(table_name)
 
     def _create_table(self, table_name):
         self.__execute_sql(f'''CREATE TABLE IF NOT EXISTS "{self.base64_encoded_aap_url}_{table_name}"
@@ -35,7 +36,7 @@ class Cache(object):
             self.__execute_sql(f'DROP TABLE IF EXISTS "{table[0]}"')
 
     def clean_cache(self, args=None):
-        table_names = ["job_templates", "projects", "inventories"]
+        table_names = list(CACHED_OBJECT_TYPES)
 
         if args in table_names:
             table_names = [args]

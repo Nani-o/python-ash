@@ -18,20 +18,21 @@ from .handlers.job_template import JobTemplateHandler
 from .handlers.job import JobHandler
 from .handlers.inventory import InventoryHandler
 from .handlers.project import ProjectHandler
+from .object_types import JOB_TEMPLATES, JOBS, INVENTORIES, PROJECTS
 
 class Ash(object):
     _CONTEXT_COMMANDS = {
-        'job_templates': JT_COMMANDS,
-        'jobs': JOB_COMMANDS,
-        'inventories': INVENTORY_COMMANDS,
-        'projects': PROJECT_COMMANDS,
+        JOB_TEMPLATES: JT_COMMANDS,
+        JOBS: JOB_COMMANDS,
+        INVENTORIES: INVENTORY_COMMANDS,
+        PROJECTS: PROJECT_COMMANDS,
     }
 
     _CONTEXT_DISPLAY = {
-        'job_templates': ('Job Template', 'cyan'),
-        'jobs': ('Job', None),
-        'inventories': ('Inventory', 'green'),
-        'projects': ('Project', 'orange'),
+        JOB_TEMPLATES: ('Job Template', 'cyan'),
+        JOBS: ('Job', None),
+        INVENTORIES: ('Inventory', 'green'),
+        PROJECTS: ('Project', 'orange'),
     }
 
     def __init__(self, config, cache):
@@ -39,10 +40,10 @@ class Ash(object):
         self.cd_commands = CD_COMMANDS
         self.ls_commands = LS_COMMANDS
         self.ls_commands_filters = {
-            'job_templates': LS_JOB_TEMPLATE_FILTERS,
-            'jobs': LS_JOBS_FILTERS,
-            'projects': LS_PROJECTS_FILTERS,
-            'inventories': LS_INVENTORIES_FILTERS
+            JOB_TEMPLATES: LS_JOB_TEMPLATE_FILTERS,
+            JOBS: LS_JOBS_FILTERS,
+            PROJECTS: LS_PROJECTS_FILTERS,
+            INVENTORIES: LS_INVENTORIES_FILTERS
         }
         self.job_template_commands = JT_COMMANDS
         if getattr(config, 'api_path', None):
@@ -122,13 +123,13 @@ class Ash(object):
         return objects, objects_by_id, objects_by_name
 
     def _load_inventories_cache(self):
-        self.inventories, self.inventories_by_id, self.inventories_by_name = self._get_objects('inventories')
+        self.inventories, self.inventories_by_id, self.inventories_by_name = self._get_objects(INVENTORIES)
 
     def _load_job_templates_cache(self):
-        self.job_templates, self.job_templates_by_id, self.job_templates_by_name = self._get_objects('job_templates')
+        self.job_templates, self.job_templates_by_id, self.job_templates_by_name = self._get_objects(JOB_TEMPLATES)
 
     def _load_projects_cache(self):
-        self.projects, self.projects_by_id, self.projects_by_name = self._get_objects('projects')
+        self.projects, self.projects_by_id, self.projects_by_name = self._get_objects(PROJECTS)
 
     def _load_all_caches(self):
         self._load_inventories_cache()
@@ -174,11 +175,11 @@ class Ash(object):
         self.current_context = context
         self.current_context_type = context_type
         if self.current_context is not None:
-            if self.current_context_type != 'jobs':
+            if self.current_context_type != JOBS:
                 self.current_context.refresh()
                 self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
             object_label, color = self._CONTEXT_DISPLAY.get(context_type, (context_type, 'white'))
-            if context_type == 'jobs':
+            if context_type == JOBS:
                 color = self.display.status_to_color(context.status)
             self.display.print(f"Switched context to {object_label}: ID={context.id}, Name={context.name}", color)
         else:
@@ -222,7 +223,7 @@ class Ash(object):
     def _cd_job_template(self, args):
         self._cd_cached_object(
             args=args,
-            object_type='job_templates',
+            object_type=JOB_TEMPLATES,
             objects=self.job_templates,
             objects_by_id=self.job_templates_by_id,
             not_found_label='Job Template',
@@ -244,12 +245,12 @@ class Ash(object):
         if not job:
             self.display.print(f"Job '{identifier}' not found.", 'red')
             return
-        self._switch_context(job, 'jobs')
+        self._switch_context(job, JOBS)
 
     def _cd_inventory(self, args):
         self._cd_cached_object(
             args=args,
-            object_type='inventories',
+            object_type=INVENTORIES,
             objects=self.inventories,
             objects_by_id=self.inventories_by_id,
             not_found_label='Inventory',
@@ -258,7 +259,7 @@ class Ash(object):
     def _cd_project(self, args):
         self._cd_cached_object(
             args=args,
-            object_type='projects',
+            object_type=PROJECTS,
             objects=self.projects,
             objects_by_id=self.projects_by_id,
             not_found_label='Project',

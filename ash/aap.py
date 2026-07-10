@@ -10,14 +10,15 @@ from termcolor import colored
 import urllib3
 
 from .models import Inventory, Project, JobTemplate, Job, Host
+from .object_types import INVENTORIES, PROJECTS, JOB_TEMPLATES, JOBS, HOSTS
 
 
 OBJECT_FACTORIES = {
-    "inventories": Inventory,
-    "projects": Project,
-    "job_templates": JobTemplate,
-    "jobs": Job,
-    "hosts": Host,
+    INVENTORIES: Inventory,
+    PROJECTS: Project,
+    JOB_TEMPLATES: JobTemplate,
+    JOBS: Job,
+    HOSTS: Host,
 }
 
 class API():
@@ -141,7 +142,7 @@ class AAP():
         self.api = api
 
     def get_inventories(self):
-        return self.api.retrieves_objects("inventories", result_limit=0)
+        return self.api.retrieves_objects(INVENTORIES, result_limit=0)
 
     def get_inventory(self, inventory_id):
         response = self.api.get_request(f"inventories/{inventory_id}/")
@@ -153,7 +154,7 @@ class AAP():
         return Inventory(self.api, response.json())
 
     def get_projects(self):
-        return self.api.retrieves_objects("projects", result_limit=0)
+        return self.api.retrieves_objects(PROJECTS, result_limit=0)
 
     def get_project(self, project_id):
         response = self.api.get_request(f"projects/{project_id}/")
@@ -165,7 +166,7 @@ class AAP():
         return Project(self.api, response.json())
 
     def get_job_templates(self):
-        return self.api.retrieves_objects("job_templates", result_limit=0)
+        return self.api.retrieves_objects(JOB_TEMPLATES, result_limit=0)
 
     def get_job_template(self, job_template_id):
         response = self.api.get_request(f"job_templates/{job_template_id}/")
@@ -177,7 +178,7 @@ class AAP():
         return JobTemplate(self.api, response.json())
 
     def get_jobs(self, filters=None, result_limit=50):
-        jobs = self.api.retrieves_objects("jobs", result_limit=result_limit,
+        jobs = self.api.retrieves_objects(JOBS, result_limit=result_limit,
                                           order_by="-finished", filters=filters)
         if jobs:
             jobs = list(reversed(jobs))

@@ -11,6 +11,7 @@ from ..commands import (
     CD_COMMANDS, LS_COMMANDS, LS_JOB_TEMPLATE_FILTERS,
     LS_INVENTORIES_FILTERS, LS_PROJECTS_FILTERS, LS_JOBS_FILTERS,
 )
+from ..object_types import CACHED_OBJECT_TYPES
 
 
 class RootHandler(BaseHandler):
@@ -122,8 +123,9 @@ class RootHandler(BaseHandler):
     def cache(self, args):
         ash = self.ash
         if args:
-            if args[0] not in ['inventories', 'projects', 'job_templates']:
-                ash.display.print(f"Unknown cache type: {args[0]}. Valid types are: inventories, projects, job_templates.", 'red')
+            valid_cache_types = ", ".join(CACHED_OBJECT_TYPES)
+            if args[0] not in CACHED_OBJECT_TYPES:
+                ash.display.print(f"Unknown cache type: {args[0]}. Valid types are: {valid_cache_types}.", 'red')
                 return
             ash.cache.clean_cache(args[0])
             method = getattr(ash, f'_load_{args[0]}_cache', None)

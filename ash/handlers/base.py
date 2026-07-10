@@ -9,6 +9,8 @@ import webbrowser
 import yaml
 from iterfzf import iterfzf
 
+from ..object_types import JOB_TEMPLATES, JOBS, INVENTORIES
+
 
 class BaseHandler:
     """Provides shared commands (info, url, open, refresh) and shared utilities
@@ -23,13 +25,13 @@ class BaseHandler:
     # ------------------------------------------------------------------ #
 
     def sync(self, args):
-        if self.ash.current_context_type == 'job_templates':
+        if self.ash.current_context_type == JOB_TEMPLATES:
             self.ash._jt_handler.sync(args)
         else:
             self.ash._project_handler.sync(args)
 
     def project(self, args):
-        if self.ash.current_context_type == 'jobs':
+        if self.ash.current_context_type == JOBS:
             self.ash._job_handler.project(args)
         else:
             self.ash._jt_handler.project(args)
@@ -48,7 +50,7 @@ class BaseHandler:
 
     def refresh(self, args):
         self.ash.current_context.refresh()
-        if self.ash.current_context_type != 'jobs':
+        if self.ash.current_context_type != JOBS:
             self.ash.cache.insert_cache(
                 self.ash.current_context_type,
                 self.ash.current_context.id,
@@ -246,7 +248,7 @@ class BaseHandler:
                     ash.inventories.append(inventory)
                     ash.inventories_by_id[int(reference)] = inventory
                     ash.inventories_by_name[inventory.name] = inventory
-                    ash.cache.insert_cache('inventories', inventory.id, inventory)
+                    ash.cache.insert_cache(INVENTORIES, inventory.id, inventory)
                 else:
                     ash.display.print(f"Invalid inventory ID {reference}. Please enter a valid inventory ID or name.", 'red')
         else:
@@ -296,5 +298,5 @@ class BaseHandler:
 
             if job:
                 ash.display.print(f"Launched job with ID: {job.id}, switching context to the new job and displaying output...", 'yellow')
-                ash._switch_context(job, 'jobs')
+                ash._switch_context(job, JOBS)
                 ash._cmd_output([])
