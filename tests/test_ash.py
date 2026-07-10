@@ -35,6 +35,7 @@ class TestAshBehavior(unittest.TestCase):
         self.ash._job_handler = JobHandler(self.ash)
         self.ash._inventory_handler = InventoryHandler(self.ash)
         self.ash._project_handler = ProjectHandler(self.ash)
+        self.ash._command_handlers = self.ash._build_command_handlers()
 
     def test_run_dispatches_known_command_with_args(self):
         self.ash.session = Mock()

@@ -8,7 +8,6 @@ import requests
 from termcolor import colored
 
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from .models import Inventory, Project, JobTemplate, Job, Host
 
@@ -22,21 +21,33 @@ OBJECT_FACTORIES = {
 }
 
 class API():
-    def __init__(self, baseurl, token, api_path):
+    def __init__(self, baseurl, token, api_path, verify_ssl=True):
         self.base_url = baseurl
         self.token = token
         self.api_path = api_path
+        self.verify_ssl = verify_ssl
         self.url = requests.compat.urljoin(self.base_url, self.api_path)
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
         }
+        if not self.verify_ssl:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    def _print_ssl_hint(self):
+        print(colored("TLS certificate verification failed.", 'red'))
+        print(colored("Hint: add your CA/intermediate certificates to trusted authorities (system trust store or REQUESTS_CA_BUNDLE).", 'yellow'))
+        print(colored("If needed for non-production usage, you can disable verification by setting 'verify_ssl: false' in ash config.", 'yellow'))
 
     def get_request(self, endpoint):
         try:
             response = requests.get(requests.compat.urljoin(self.url, endpoint), headers=self.headers,
-                                    verify=False, timeout=10)
+                                    verify=self.verify_ssl, timeout=10)
             return response
+        except requests.exceptions.SSLError as e:
+            print(colored(f"Error connecting to API: {e}", 'red'))
+            self._print_ssl_hint()
+            return None
         except requests.exceptions.RequestException as e:
             print(colored(f"Error connecting to API: {e}", 'red'))
             return None
@@ -44,8 +55,12 @@ class API():
     def post_request(self, endpoint, payload):
         try:
             response = requests.post(requests.compat.urljoin(self.url, endpoint), headers=self.headers,
-                                     json=payload, verify=False, timeout=10)
+                                     json=payload, verify=self.verify_ssl, timeout=10)
             return response
+        except requests.exceptions.SSLError as e:
+            print(colored(f"Error connecting to API: {e}", 'red'))
+            self._print_ssl_hint()
+            return None
         except requests.exceptions.RequestException as e:
             print(colored(f"Error connecting to API: {e}", 'red'))
             return None
@@ -53,8 +68,12 @@ class API():
     def delete_request(self, endpoint):
         try:
             response = requests.delete(requests.compat.urljoin(self.url, endpoint), headers=self.headers,
-                                       verify=False, timeout=10)
+                                       verify=self.verify_ssl, timeout=10)
             return response
+        except requests.exceptions.SSLError as e:
+            print(colored(f"Error connecting to API: {e}", 'red'))
+            self._print_ssl_hint()
+            return None
         except requests.exceptions.RequestException as e:
             print(colored(f"Error connecting to API: {e}", 'red'))
             return None

@@ -60,7 +60,7 @@ class BaseHandler:
         url = self.ash.current_context.absolute_url
         if url:
             try:
-                subprocess.run("pbcopy", universal_newlines=True, input=url)
+                subprocess.run(["pbcopy"], check=True, text=True, input=url)
                 print(f"{url} copied to clipboard.")
             except Exception:
                 print(f"Unable to copy URL to clipboard. Please copy it manually : {url}")

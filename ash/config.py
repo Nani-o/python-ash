@@ -6,6 +6,7 @@
 
 import os
 import sys
+from urllib.parse import urlparse
 from pathlib import Path
 from iterfzf import iterfzf
 
@@ -36,6 +37,7 @@ CONFIGS = [
     'base_url',
     'token',
     'api_path',
+    'verify_ssl',
     'description',
     'description_color'
 ]
@@ -55,6 +57,9 @@ class Config():
             self.config_file = config_file
         config = self.__load_config()
         if not isinstance(config, dict):
+            if not isinstance(config, list) or not config:
+                print(f"Invalid config format in {self.config_file}. Expected a mapping or a non-empty list of mappings.")
+                sys.exit(1)
             if len(config) == 1:
                 config = config[0]
             else:
@@ -79,12 +84,41 @@ class Config():
             else:
                 print(f"Unknown config key: {k}")
                 sys.exit(1)
+
+        self._validate_config()
         self.config = config
+
+    def _validate_config(self):
+        if not getattr(self, 'base_url', None):
+            print("Missing required config key: base_url")
+            sys.exit(1)
+        if not getattr(self, 'token', None):
+            print("Missing required config key: token")
+            sys.exit(1)
+
+        parsed = urlparse(str(self.base_url))
+        if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+            print(f"Invalid base_url: {self.base_url}. Expected an absolute URL with http/https.")
+            sys.exit(1)
+
+        if not getattr(self, 'api_path', None):
+            self.api_path = '/api/controller/v2/'
+        if not str(self.api_path).startswith('/'):
+            print(f"Invalid api_path: {self.api_path}. It must start with '/'.")
+            sys.exit(1)
+
+        verify_ssl = getattr(self, 'verify_ssl', True)
+        if isinstance(verify_ssl, str):
+            verify_ssl = verify_ssl.strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+        self.verify_ssl = bool(verify_ssl)
 
     def __load_config(self):
         if os.path.exists(self.config_file):
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
+            if config is None:
+                print(f"Configuration file {self.config_file} is empty.")
+                sys.exit(1)
             return config
 
         print("You must create a config file " + str(self.config_file))

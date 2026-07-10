@@ -20,6 +20,20 @@ from .handlers.inventory import InventoryHandler
 from .handlers.project import ProjectHandler
 
 class Ash(object):
+    _CONTEXT_COMMANDS = {
+        'job_templates': JT_COMMANDS,
+        'jobs': JOB_COMMANDS,
+        'inventories': INVENTORY_COMMANDS,
+        'projects': PROJECT_COMMANDS,
+    }
+
+    _CONTEXT_DISPLAY = {
+        'job_templates': ('Job Template', 'cyan'),
+        'jobs': ('Job', None),
+        'inventories': ('Inventory', 'green'),
+        'projects': ('Project', 'orange'),
+    }
+
     def __init__(self, config, cache):
         self.commands = ROOT_COMMANDS
         self.cd_commands = CD_COMMANDS
@@ -35,7 +49,7 @@ class Ash(object):
             api_path = config.api_path
         else:
             api_path = "/api/controller/v2/"
-        self.api = API(config.base_url, config.token, api_path)
+        self.api = API(config.base_url, config.token, api_path, verify_ssl=getattr(config, 'verify_ssl', True))
         self.api_description = getattr(config, 'description', None)
         self.api_description_color = getattr(config, 'description_color', 'white')
         self.aap = AAP(self.api)
@@ -149,16 +163,10 @@ class Ash(object):
     # ------------------------------------------------------------------ #
 
     def _get_commands_for_context(self, context_type):
-        if context_type == 'job_templates':
-            return OrderedDict(list(JT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'jobs':
-            return OrderedDict(list(JOB_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'inventories':
-            return OrderedDict(list(INVENTORY_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        elif context_type == 'projects':
-            return OrderedDict(list(PROJECT_COMMANDS.items()) + list(ROOT_COMMANDS.items()))
-        else:
+        context_commands = self._CONTEXT_COMMANDS.get(context_type)
+        if not context_commands:
             return ROOT_COMMANDS.copy()
+        return OrderedDict(list(context_commands.items()) + list(ROOT_COMMANDS.items()))
 
     def _switch_context(self, context, context_type):
         self.last_context = self.current_context
@@ -169,14 +177,10 @@ class Ash(object):
             if self.current_context_type != 'jobs':
                 self.current_context.refresh()
                 self.cache.insert_cache(self.current_context_type, self.current_context.id, self.current_context)
-            if context_type == 'job_templates':
-                self.display.print(f"Switched context to Job Template: ID={context.id}, Name={context.name}", 'cyan')
-            elif context_type == 'jobs':
-                self.display.print(f"Switched context to Job: ID={context.id}, Name={context.name}", self.display.status_to_color(context.status))
-            elif context_type == 'inventories':
-                self.display.print(f"Switched context to Inventory: ID={context.id}, Name={context.name}", 'green')
-            elif context_type == 'projects':
-                self.display.print(f"Switched context to Project: ID={context.id}, Name={context.name}", 'orange')
+            object_label, color = self._CONTEXT_DISPLAY.get(context_type, (context_type, 'white'))
+            if context_type == 'jobs':
+                color = self.display.status_to_color(context.status)
+            self.display.print(f"Switched context to {object_label}: ID={context.id}, Name={context.name}", color)
         else:
             self.display.print("Switched to root context", 'white')
 
@@ -196,6 +200,19 @@ class Ash(object):
                 return next((obj for obj in matches if obj.id == selected_id), None)
         return None
 
+    def _cd_cached_object(self, args, object_type, objects, objects_by_id, not_found_label):
+        identifier = ' '.join(args)
+        selected_object = None
+        if identifier.isdigit():
+            selected_object = objects_by_id.get(int(identifier))
+        else:
+            selected_object = self._find_matching_objects(objects, identifier)
+
+        if not selected_object:
+            self.display.print(f"{not_found_label} '{identifier}' not found.", 'red')
+            return
+        self._switch_context(selected_object, object_type)
+
     # Change directory command implementations
     #
     # Note: The CD commands will attempt to find the specified object by ID first, then by name (case-insensitive, partial match).
@@ -203,17 +220,13 @@ class Ash(object):
     # The context is switched to the specified object and the available commands are updated accordingly.
 
     def _cd_job_template(self, args):
-        identifier = ' '.join(args)
-        jt = None
-        if identifier.isdigit():
-            jt = self.job_templates_by_id.get(int(identifier))
-        else:
-            jt = self._find_matching_objects(self.job_templates, identifier)
-
-        if not jt:
-            self.display.print(f"Job Template '{identifier}' not found.", 'red')
-            return
-        self._switch_context(jt, 'job_templates')
+        self._cd_cached_object(
+            args=args,
+            object_type='job_templates',
+            objects=self.job_templates,
+            objects_by_id=self.job_templates_by_id,
+            not_found_label='Job Template',
+        )
 
     def _cd_job(self, args):
         identifier = ' '.join(args)
@@ -234,30 +247,22 @@ class Ash(object):
         self._switch_context(job, 'jobs')
 
     def _cd_inventory(self, args):
-        identifier = ' '.join(args)
-        inv = None
-        if identifier.isdigit():
-            inv = self.inventories_by_id.get(int(identifier))
-        else:
-            inv = self._find_matching_objects(self.inventories, identifier)
-
-        if not inv:
-            self.display.print(f"Inventory '{identifier}' not found.", 'red')
-            return
-        self._switch_context(inv, 'inventories')
+        self._cd_cached_object(
+            args=args,
+            object_type='inventories',
+            objects=self.inventories,
+            objects_by_id=self.inventories_by_id,
+            not_found_label='Inventory',
+        )
 
     def _cd_project(self, args):
-        identifier = ' '.join(args)
-        proj = None
-        if identifier.isdigit():
-            proj = self.projects_by_id.get(int(identifier))
-        else:
-            proj = self._find_matching_objects(self.projects, identifier)
-
-        if not proj:
-            self.display.print(f"Project '{identifier}' not found.", 'red')
-            return
-        self._switch_context(proj, 'projects')
+        self._cd_cached_object(
+            args=args,
+            object_type='projects',
+            objects=self.projects,
+            objects_by_id=self.projects_by_id,
+            not_found_label='Project',
+        )
 
     # Delegation aliases used by handlers/tests via the Ash surface.
 
