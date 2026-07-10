@@ -57,23 +57,29 @@ class BaseHandler:
         print("Context refreshed.")
 
     def url(self, args):
+        ash = self.ash
         url = self.ash.current_context.absolute_url
         if url:
             try:
                 subprocess.run(["pbcopy"], check=True, text=True, input=url)
-                print(f"{url} copied to clipboard.")
-            except Exception:
-                print(f"Unable to copy URL to clipboard. Please copy it manually : {url}")
+                ash.display.print(f"{url} copied to clipboard.", 'green')
+            except FileNotFoundError:
+                ash.display.print(f"Clipboard utility not available. Please copy manually: {url}", 'yellow')
+            except subprocess.CalledProcessError as exc:
+                ash.display.print(f"Unable to copy URL to clipboard (exit {exc.returncode}). Please copy manually: {url}", 'yellow')
+            except OSError as exc:
+                ash.display.print(f"Unable to access clipboard: {exc}. Please copy manually: {url}", 'yellow')
         else:
-            print("Unable to get URL for the current context.", 'red')
+            ash.display.print("Unable to get URL for the current context.", 'red')
 
     def open(self, args):
+        ash = self.ash
         url = self.ash.current_context.absolute_url
         if url:
             webbrowser.open(url)
-            print(f"Opened {url} in your browser.")
+            ash.display.print(f"Opened {url} in your browser.", 'green')
         else:
-            print("Unable to get URL for the current context.", 'red')
+            ash.display.print("Unable to get URL for the current context.", 'red')
 
     # ------------------------------------------------------------------ #
     # Shared utilities
@@ -108,6 +114,7 @@ class BaseHandler:
             options.add("--header=Select one or more options using tab/shift+tab and press Enter when done.")
             height += 1
         options.add(f"--height={height}")
+
         if required and not default:
             while not user_input:
                 user_input = iterfzf(choices, prompt=f"{name} ({description}) [required]: ", __extra__=options, multi=multi)

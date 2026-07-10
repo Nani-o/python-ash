@@ -158,6 +158,37 @@ class TestAshBehavior(unittest.TestCase):
             [{"inventory": 42, "extra_vars": {"env": "prod", "branch": "main"}}],
         )
 
+    def test_get_commands_for_context_returns_context_plus_root(self):
+        commands = self.ash._get_commands_for_context("projects")
+
+        self.assertIn("sync", commands)
+        self.assertIn("cd", commands)
+        self.assertEqual(commands["sync"], "project: Sync the selected project")
+
+    def test_get_commands_for_unknown_context_returns_root_copy(self):
+        commands = self.ash._get_commands_for_context("unknown_context")
+
+        self.assertEqual(commands, ROOT_COMMANDS)
+        self.assertIsNot(commands, ROOT_COMMANDS)
+
+    def test_cd_project_uses_shared_cached_object_resolution(self):
+        project = SimpleNamespace(id=42, name="Platform")
+        self.ash.projects = [project]
+        self.ash.projects_by_id = {42: project}
+        self.ash._switch_context = Mock()
+
+        self.ash._cd_project(["42"])
+
+        self.ash._switch_context.assert_called_once_with(project, "projects")
+
+    def test_cd_inventory_not_found_displays_error(self):
+        self.ash.inventories = []
+        self.ash.inventories_by_id = {}
+
+        self.ash._cd_inventory(["does-not-exist"])
+
+        self.ash.display.print.assert_called_with("Inventory 'does-not-exist' not found.", 'red')
+
 
 if __name__ == "__main__":
     unittest.main()

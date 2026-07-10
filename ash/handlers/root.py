@@ -21,14 +21,15 @@ class RootHandler(BaseHandler):
     # ------------------------------------------------------------------ #
 
     def ls(self, args):
+        ash = self.ash
         if len(args) == 0:
-            print("Usage: ls <object_type>")
+            ash.display.print("Usage: ls <object_type>", 'yellow')
             return
 
         object_type = args[0]
 
         if object_type not in LS_COMMANDS.keys():
-            print(f"Unknown object type: {object_type}")
+            ash.display.print(f"Unknown object type: {object_type}", 'red')
             return
 
         method = getattr(self, f'_ls_{object_type}', None)
@@ -37,7 +38,7 @@ class RootHandler(BaseHandler):
     def _ls_job_templates(self, args):
         ash = self.ash
         if not ash.job_templates:
-            print("No job templates in cache. Try using 'cache' command.")
+            ash.display.print("No job templates in cache. Try using 'cache' command.", 'yellow')
             return
 
         job_templates = ash.filter_objects(ash.job_templates, args, LS_JOB_TEMPLATE_FILTERS)
@@ -50,12 +51,12 @@ class RootHandler(BaseHandler):
         if jobs:
             ash.display.display_jobs(jobs)
         else:
-            print("No jobs found.")
+            ash.display.print("No jobs found.", 'yellow')
 
     def _ls_inventories(self, args):
         ash = self.ash
         if not ash.inventories:
-            print("No inventories in cache. Try using 'cache' command.")
+            ash.display.print("No inventories in cache. Try using 'cache' command.", 'yellow')
             return
 
         inventories = ash.filter_objects(ash.inventories, args, LS_INVENTORIES_FILTERS)
@@ -64,7 +65,7 @@ class RootHandler(BaseHandler):
     def _ls_projects(self, args):
         ash = self.ash
         if not ash.projects:
-            print("No projects in cache. Try using 'cache' command.")
+            ash.display.print("No projects in cache. Try using 'cache' command.", 'yellow')
             return
 
         projects = ash.filter_objects(ash.projects, args, LS_PROJECTS_FILTERS)
@@ -122,7 +123,7 @@ class RootHandler(BaseHandler):
         ash = self.ash
         if args:
             if args[0] not in ['inventories', 'projects', 'job_templates']:
-                print(f"Unknown cache type: {args[0]}. Valid types are: inventories, projects, job_templates.")
+                ash.display.print(f"Unknown cache type: {args[0]}. Valid types are: inventories, projects, job_templates.", 'red')
                 return
             ash.cache.clean_cache(args[0])
             method = getattr(ash, f'_load_{args[0]}_cache', None)
@@ -130,7 +131,7 @@ class RootHandler(BaseHandler):
         else:
             ash.cache.clean_cache()
             ash._load_all_caches()
-        print("Cache refreshed.")
+        ash.display.print("Cache refreshed.", 'green')
 
     # ------------------------------------------------------------------ #
     # cd
