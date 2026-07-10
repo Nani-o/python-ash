@@ -1,9 +1,11 @@
 import io
 import unittest
+from collections import namedtuple
 from contextlib import redirect_stdout
 from collections import OrderedDict
 from types import SimpleNamespace
 from unittest.mock import Mock, call
+from unittest.mock import patch
 
 from ash.ash import Ash
 from ash.commands import JT_COMMANDS, ROOT_COMMANDS
@@ -230,6 +232,34 @@ class TestAshBehavior(unittest.TestCase):
 
         self.ash.aap.get_jobs.assert_not_called()
         self.ash.display.print.assert_called_with("Invalid result_limit value. It should be an integer.", 'red')
+
+    def test_watch_renders_description_on_last_line(self):
+        terminal_size = namedtuple("TerminalSize", ["columns", "lines"])(80, 24)
+        self.ash.api_description = "My AAP instance"
+        self.ash.api_description_color = "green"
+        self.ash.aap = Mock()
+        self.ash.aap.get_jobs.return_value = []
+        watch_args = ["project:demo", "nightly"]
+
+        with patch("ash.handlers.root.get_terminal_size", return_value=terminal_size), \
+             patch("ash.handlers.root.time.sleep", side_effect=KeyboardInterrupt):
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                with self.assertRaises(KeyboardInterrupt):
+                    self.ash._root_handler.watch(watch_args)
+
+        self.ash.aap.get_jobs.assert_called_once_with(
+            filters={"project__search": ["demo"], "search": ["nightly"]},
+            result_limit=22,
+        )
+        output = stdout.getvalue()
+        self.assertIn("\033[?25l", output)
+        self.assertIn("\033[?25h", output)
+        self.assertIn("\033[24;1H\033[2K", output)
+        self.assertIn("\033[24;22H", output)
+        self.assertIn("[My AAP instance]", output)
+        self.assertIn("project:demo nightly", output)
+        self.assertIn("\033[32m", output)
 
 
 if __name__ == "__main__":

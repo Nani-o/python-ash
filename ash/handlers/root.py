@@ -106,19 +106,61 @@ class RootHandler(BaseHandler):
 
     def watch(self, args):
         ash = self.ash
-        while True:
-            result_limit = get_terminal_size().lines - 2
-            filters, _ = self._parse_ls_jobs_args(args)
-            if filters is None:
-                return
-            jobs = ash.aap.get_jobs(filters=filters, result_limit=result_limit)
-            # Move cursor to the beginning of the first line and clear to the end of the screen
-            sys.stdout.write('\033[H')  # Move cursor to the top-left corner
-            sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
+        sys.stdout.write('\033[?25l')
+        sys.stdout.flush()
+        try:
+            while True:
+                terminal_size = get_terminal_size()
+                result_limit = max(0, terminal_size.lines - 2)
+                filters, _ = self._parse_ls_jobs_args(args)
+                if filters is None:
+                    return
+                jobs = ash.aap.get_jobs(filters=filters, result_limit=result_limit)
+                # Move cursor to the beginning of the first line and clear to the end of the screen
+                sys.stdout.write('\033[H')  # Move cursor to the top-left corner
+                sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
+                sys.stdout.flush()
+                if jobs:
+                    ash.display.display_jobs(jobs)
+                self._render_watch_description(terminal_size, args)
+                time.sleep(5)
+        finally:
+            sys.stdout.write('\033[?25h')
             sys.stdout.flush()
-            if jobs:
-                ash.display.display_jobs(jobs)
-            time.sleep(5)
+
+    def _render_watch_description(self, terminal_size, args):
+        ash = self.ash
+        description = getattr(ash, 'api_description', None)
+        if not description:
+            return
+
+        footer_parts = [f'[{description}]']
+        filter_text = ' '.join(arg for arg in args).strip()
+        if filter_text:
+            footer_parts.append('- Jobs ' + filter_text)
+
+        footer = ' '.join(footer_parts)
+        if len(footer) > terminal_size.columns:
+            footer = footer[:max(0, terminal_size.columns - 3)] + '...'
+
+        footer_width = len(footer)
+        start_column = max(1, (terminal_size.columns - footer_width) // 2 + 1)
+
+        sys.stdout.write(f'\033[{terminal_size.lines};1H')
+        sys.stdout.write('\033[2K')
+        sys.stdout.write(f'\033[{terminal_size.lines};{start_column}H')
+        color_code = {
+            'white': '37',
+            'cyan': '36',
+            'yellow': '33',
+            'red': '31',
+            'green': '32',
+            'magenta': '35',
+            'orange': '38;5;208',
+            'blue': '34',
+        }.get(getattr(ash, 'api_description_color', None), '37')
+        sys.stdout.write(f'\033[{color_code}m{footer}\033[0m')
+        sys.stdout.flush()
 
     # ------------------------------------------------------------------ #
     # cache
