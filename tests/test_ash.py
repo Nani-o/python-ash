@@ -13,6 +13,7 @@ from ash.handlers.job_template import JobTemplateHandler
 from ash.handlers.job import JobHandler
 from ash.handlers.inventory import InventoryHandler
 from ash.handlers.project import ProjectHandler
+from ash.object_types import PROJECTS, INVENTORIES, CACHED_OBJECT_TYPES
 
 
 LIST_JOBS_COMMAND_LINE = "ls jobs project:demo nightly result_limit:5"
@@ -63,7 +64,7 @@ class TestAshBehavior(unittest.TestCase):
         self.ash.aap = Mock()
 
         with redirect_stdout(io.StringIO()):
-            loaded, by_id, by_name = self.ash._get_objects("inventories")
+            loaded, by_id, by_name = self.ash._get_objects(INVENTORIES)
 
         self.assertEqual(loaded, objects)
         self.assertEqual(by_id, {1: objects[0], 2: objects[1]})
@@ -82,14 +83,14 @@ class TestAshBehavior(unittest.TestCase):
         self.ash.aap.get_projects.return_value = objects
 
         with redirect_stdout(io.StringIO()):
-            loaded, by_id, by_name = self.ash._get_objects("projects")
+            loaded, by_id, by_name = self.ash._get_objects(PROJECTS)
 
         self.assertEqual(loaded, objects)
         self.assertEqual(by_id, {10: objects[0], 11: objects[1]})
         self.assertEqual(by_name, {"Project A": objects[0], "Project B": objects[1]})
         self.ash.aap.get_projects.assert_called_once_with()
         self.ash.cache.insert_cache.assert_has_calls(
-            [call("projects", 10, objects[0]), call("projects", 11, objects[1])]
+            [call(PROJECTS, 10, objects[0]), call(PROJECTS, 11, objects[1])]
         )
 
     def test_filter_objects_supports_named_filters_and_plain_search(self):
@@ -159,7 +160,7 @@ class TestAshBehavior(unittest.TestCase):
         )
 
     def test_get_commands_for_context_returns_context_plus_root(self):
-        commands = self.ash._get_commands_for_context("projects")
+        commands = self.ash._get_commands_for_context(PROJECTS)
 
         self.assertIn("sync", commands)
         self.assertIn("cd", commands)
@@ -179,7 +180,7 @@ class TestAshBehavior(unittest.TestCase):
 
         self.ash._cd_project(["42"])
 
-        self.ash._switch_context.assert_called_once_with(project, "projects")
+        self.ash._switch_context.assert_called_once_with(project, PROJECTS)
 
     def test_cd_inventory_not_found_displays_error(self):
         self.ash.inventories = []
@@ -188,6 +189,47 @@ class TestAshBehavior(unittest.TestCase):
         self.ash._cd_inventory(["does-not-exist"])
 
         self.ash.display.print.assert_called_with("Inventory 'does-not-exist' not found.", 'red')
+
+    def test_root_cache_with_invalid_type_prints_valid_types(self):
+        self.ash.cache = Mock()
+        self.ash._load_all_caches = Mock()
+
+        self.ash._root_handler.cache(["invalid_type"])
+
+        valid_types = ", ".join(CACHED_OBJECT_TYPES)
+        self.ash.display.print.assert_called_with(
+            f"Unknown cache type: invalid_type. Valid types are: {valid_types}.",
+            'red',
+        )
+        self.ash.cache.clean_cache.assert_not_called()
+
+    def test_root_cache_with_valid_type_refreshes_single_cache(self):
+        self.ash.cache = Mock()
+        self.ash._load_projects_cache = Mock()
+
+        self.ash._root_handler.cache([PROJECTS])
+
+        self.ash.cache.clean_cache.assert_called_once_with(PROJECTS)
+        self.ash._load_projects_cache.assert_called_once_with()
+        self.ash.display.print.assert_any_call("Cache refreshed.", 'green')
+
+    def test_root_cache_without_args_refreshes_all_caches(self):
+        self.ash.cache = Mock()
+        self.ash._load_all_caches = Mock()
+
+        self.ash._root_handler.cache([])
+
+        self.ash.cache.clean_cache.assert_called_once_with()
+        self.ash._load_all_caches.assert_called_once_with()
+        self.ash.display.print.assert_any_call("Cache refreshed.", 'green')
+
+    def test_ls_jobs_invalid_result_limit_does_not_query_api(self):
+        self.ash.aap = Mock()
+
+        self.ash._root_handler._ls_jobs(["result_limit:not_an_int"])
+
+        self.ash.aap.get_jobs.assert_not_called()
+        self.ash.display.print.assert_called_with("Invalid result_limit value. It should be an integer.", 'red')
 
 
 if __name__ == "__main__":
