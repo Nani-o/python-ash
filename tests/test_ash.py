@@ -253,12 +253,15 @@ class TestAshBehavior(unittest.TestCase):
             result_limit=22,
         )
         output = stdout.getvalue()
+        expected_footer = "[My AAP instance] - Jobs project:demo nightly"
+        expected_start_column = (
+            terminal_size.columns - len(expected_footer)
+        ) // 2 + 1
         self.assertIn("\033[?25l", output)
         self.assertIn("\033[?25h", output)
         self.assertIn("\033[24;1H\033[2K", output)
-        self.assertIn("\033[24;22H", output)
-        self.assertIn("[My AAP instance]", output)
-        self.assertIn("project:demo nightly", output)
+        self.assertIn(f"\033[24;{expected_start_column}H", output)
+        self.assertIn(expected_footer, output)
         self.assertIn("\033[32m", output)
 
 
