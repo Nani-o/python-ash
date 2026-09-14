@@ -1,4 +1,5 @@
 import io
+import json
 import unittest
 from collections import namedtuple
 from contextlib import redirect_stdout
@@ -6,9 +7,11 @@ from collections import OrderedDict
 from types import SimpleNamespace
 from unittest.mock import Mock, call
 from unittest.mock import patch
+from prompt_toolkit.document import Document
 
 from ash.ash import Ash
 from ash.commands import JT_COMMANDS, ROOT_COMMANDS
+from ash.completer import AshCompleter
 from ash.handlers.base import BaseHandler
 from ash.handlers.root import RootHandler
 from ash.handlers.job_template import JobTemplateHandler
@@ -54,6 +57,78 @@ class TestAshBehavior(unittest.TestCase):
         self.ash.aap.get_jobs.assert_called_once_with(
             filters={"project__search": ["demo"], "search": ["nightly"]},
             result_limit=5,
+        )
+
+    def test_info_pretty_prints_json_objects_and_arrays(self):
+        self.ash.current_context = SimpleNamespace(data={
+            "extra_vars": json.dumps({
+                "service": {"port": 8080},
+                "hosts": ["one", "two"],
+                "embedded": json.dumps({"enabled": True}),
+            }),
+            "json_scalar": "42",
+            "plain_text": "not json",
+        })
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.ash._base_handler.info([])
+
+        self.assertEqual(json.loads(output.getvalue()), {
+            "extra_vars": {
+                "service": {"port": 8080},
+                "hosts": ["one", "two"],
+                "embedded": {"enabled": True},
+            },
+            "json_scalar": "42",
+            "plain_text": "not json",
+        })
+        self.assertIn('\n    "extra_vars": {', output.getvalue())
+
+    def test_info_resolves_nested_dict_and_list_paths(self):
+        self.ash.current_context = SimpleNamespace(data={
+            "extra_vars": '{"services": [{"name": "api"}, {"name": "worker"}]}',
+        })
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.ash._base_handler.info([
+                "extra_vars.services.1.name",
+                "extra_vars.services.9.name",
+                "extra_vars.services.invalid",
+                "extra_vars.services.0.name.child",
+            ])
+
+        self.assertEqual(json.loads(output.getvalue()), {
+            "extra_vars.services.1.name": "worker",
+            "extra_vars.services.9.name": None,
+            "extra_vars.services.invalid": None,
+            "extra_vars.services.0.name.child": None,
+        })
+
+    def test_info_completes_nested_json_keys_and_list_indexes(self):
+        self.ash.current_context = SimpleNamespace(data={
+            "extra_vars": '{"services": [{"name": "api"}]}',
+            "status": "successful",
+        })
+        completer = AshCompleter(self.ash)
+
+        def completions(text):
+            document = Document(text, cursor_position=len(text))
+            return [item.text for item in completer.get_completions(document, None)]
+
+        self.assertEqual(completions("info ext"), ["extra_vars"])
+        self.assertEqual(
+            completions("info extra_vars."),
+            ["extra_vars.services"],
+        )
+        self.assertEqual(
+            completions("info extra_vars.services."),
+            ["extra_vars.services.0"],
+        )
+        self.assertEqual(
+            completions("info status extra_vars.services.0.n"),
+            ["extra_vars.services.0.name"],
         )
 
     def test_get_objects_uses_cache_when_available(self):

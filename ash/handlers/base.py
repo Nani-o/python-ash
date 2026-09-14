@@ -9,6 +9,7 @@ import webbrowser
 import yaml
 from iterfzf import iterfzf
 
+from ..data_paths import normalize_json_values, resolve_data_path
 from ..object_types import JOB_TEMPLATES, JOBS, INVENTORIES
 
 
@@ -40,12 +41,14 @@ class BaseHandler:
         self.ash._job_handler.inventory(args)
 
     def info(self, args):
-        info = {}
+        data = normalize_json_values(self.ash.current_context.data)
         if args:
+            info = {}
             for arg in args:
-                info[arg] = self.ash.current_context.data.get(arg, None)
+                found, value = resolve_data_path(data, arg)
+                info[arg] = value if found else None
         else:
-            info = self.ash.current_context.data
+            info = data
         print(json.dumps(info, indent=4))
 
     def refresh(self, args):

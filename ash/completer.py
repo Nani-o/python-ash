@@ -8,6 +8,7 @@ import json
 import os
 
 from collections import OrderedDict
+from .data_paths import complete_data_path, normalize_json_values
 from .object_types import JOB_TEMPLATES, JOBS, INVENTORIES, PROJECTS
 
 
@@ -90,10 +91,8 @@ class AshCompleter(BaseCompleter):
                     ['inventories', 'job_templates', 'projects']
                 )
             elif command == "info":
-                self.completions = self._match_input(
-                    self.cur_word,
-                    list(self.ash.current_context.data.keys())
-                )
+                data = normalize_json_values(self.ash.current_context.data)
+                self.completions = complete_data_path(data, self.cur_word)
 
         if isinstance(self.completions, list):
             self.completions.sort()
