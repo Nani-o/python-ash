@@ -300,6 +300,40 @@ class TestAshBehavior(unittest.TestCase):
             {"extra_vars": {"environment": "production"}},
         )
 
+    def test_ask_extra_vars_uses_yaml_default_and_parses_yaml_edits(self):
+        self.ash.current_context = SimpleNamespace(extra_vars=json.dumps({
+            "environment": "production",
+            "services": [{"name": "api", "port": 8080}],
+        }))
+        self.ash.session_wo_history = Mock()
+        self.ash.session_wo_history.prompt.return_value = (
+            "environment: staging\n"
+            "services:\n"
+            "- name: worker\n"
+            "  port: 8081"
+        )
+        expected_default = (
+            "environment: production\n"
+            "services:\n"
+            "- name: api\n"
+            "  port: 8080"
+        )
+
+        result = self.ash._base_handler._ask_variable("extra_vars")
+
+        self.ash.session_wo_history.prompt.assert_called_once_with(
+            "extra_vars: \n",
+            multiline=True,
+            default=expected_default,
+        )
+        self.assertEqual(result, (
+            "extra_vars",
+            {
+                "environment": "staging",
+                "services": [{"name": "worker", "port": 8081}],
+            },
+        ))
+
     def test_get_commands_for_context_returns_context_plus_root(self):
         commands = self.ash._get_commands_for_context(PROJECTS)
 

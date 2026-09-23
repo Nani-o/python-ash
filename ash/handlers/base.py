@@ -176,6 +176,19 @@ class BaseHandler:
             default = inventory.get('id')
             if default:
                 default_display = f"{default}:{inventory.get('name', '')}"
+        elif var == "extra_vars":
+            default = getattr(ash.current_context, var, '')
+            if default:
+                try:
+                    parsed_default = yaml.safe_load(default) if isinstance(default, str) else default
+                    if isinstance(parsed_default, (dict, list)):
+                        default = yaml.safe_dump(
+                            parsed_default,
+                            default_flow_style=False,
+                            sort_keys=False,
+                        ).rstrip()
+                except yaml.YAMLError:
+                    pass
         else:
             default = getattr(ash.current_context, var, '')
 
