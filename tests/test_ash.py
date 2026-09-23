@@ -236,6 +236,70 @@ class TestAshBehavior(unittest.TestCase):
             [{"inventory": 42, "extra_vars": {"env": "prod", "branch": "main"}}],
         )
 
+    def test_reuse_allows_scm_branch_and_extra_vars_to_be_edited(self):
+        template = Mock()
+        template.get_asked_variables.return_value = [
+            "scm_branch",
+            "extra_vars",
+            "limit",
+            "credential",
+        ]
+        job = SimpleNamespace(
+            job_template=42,
+            scm_branch="main",
+            extra_vars='{"environment": "production"}',
+            limit="old-hosts",
+            summary_fields={"credentials": [{"id": 7}]},
+        )
+        self.ash.current_context = job
+        self.ash.job_templates_by_id = {42: template}
+        prompted_values = {
+            "scm_branch": ("scm_branch", "feature/reuse"),
+            "limit": ("limit", "new-hosts"),
+            "extra_vars": ("extra_vars", {"environment": "staging"}),
+        }
+        self.ash._ask_variable = Mock(side_effect=lambda var: prompted_values[var])
+        self.ash._job_handler._execute_payload = Mock()
+
+        self.ash._job_handler.reuse([])
+
+        self.assertEqual(
+            self.ash._ask_variable.call_args_list,
+            [call("scm_branch"), call("limit"), call("extra_vars")],
+        )
+        self.ash._job_handler._execute_payload.assert_called_once_with(
+            template,
+            {
+                "scm_branch": "feature/reuse",
+                "limit": "new-hosts",
+                "credential": [7],
+                "extra_vars": {"environment": "staging"},
+            },
+        )
+
+    def test_reuse_always_offers_existing_extra_vars_for_editing(self):
+        template = Mock()
+        template.get_asked_variables.return_value = []
+        job = SimpleNamespace(
+            job_template=42,
+            extra_vars='{"environment": "production"}',
+            summary_fields={},
+        )
+        self.ash.current_context = job
+        self.ash.job_templates_by_id = {42: template}
+        self.ash._ask_variable = Mock(
+            return_value=("extra_vars", {"environment": "production"}),
+        )
+        self.ash._job_handler._execute_payload = Mock()
+
+        self.ash._job_handler.reuse([])
+
+        self.ash._ask_variable.assert_called_once_with("extra_vars")
+        self.ash._job_handler._execute_payload.assert_called_once_with(
+            template,
+            {"extra_vars": {"environment": "production"}},
+        )
+
     def test_get_commands_for_context_returns_context_plus_root(self):
         commands = self.ash._get_commands_for_context(PROJECTS)
 

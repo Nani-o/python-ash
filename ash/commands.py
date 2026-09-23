@@ -41,7 +41,7 @@ JOB_COMMANDS = OrderedDict([
     ('open', 'job: Open the selected job in your browser'),
     ('url', 'job: Show the URL of the selected job'),
     ('relaunch', 'job: Relaunch the selected job'),
-    ('reuse', 'job: Reuse the selected job parameters as prefill for a new job'),
+    ('reuse', 'job: Reuse and edit the selected job parameters for a new job'),
     ('cancel', 'job: Cancel the selected job'),
     ('output', 'job: Show output of the selected job'),
     ('inventory', 'job: Switch context to the inventory of the selected job'),

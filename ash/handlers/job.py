@@ -2,8 +2,6 @@
 
 """Job context command handler."""
 
-import json
-
 from .base import BaseHandler
 
 
@@ -32,17 +30,18 @@ class JobHandler(BaseHandler):
             return
 
         for var in template.get_asked_variables():
-            if var in ['inventory', 'limit', 'job_tags', 'skip_tags']:
+            if var in ['inventory', 'limit', 'job_tags', 'skip_tags', 'scm_branch']:
                 key, user_input = ash._ask_variable(var)
                 payload[key] = user_input
             elif var == 'credential':
                 payload['credential'] = [cred['id'] for cred in job.summary_fields.get('credentials', [])]
-            elif var == 'variables':
+            elif var == 'extra_vars':
                 pass
             else:
                 payload[var] = getattr(job, var, None)
 
-        payload['extra_vars'] = json.loads(job.extra_vars) if job.extra_vars else {}
+        key, user_input = ash._ask_variable('extra_vars')
+        payload[key] = user_input
 
         self._execute_payload(template, payload)
 
