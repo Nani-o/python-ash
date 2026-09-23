@@ -3,6 +3,7 @@
 """Job context command handler."""
 
 from .base import BaseHandler
+from ..notifications import notify_job_finished
 
 
 class JobHandler(BaseHandler):
@@ -53,7 +54,11 @@ class JobHandler(BaseHandler):
             ash.display.print("Failed to cancel the job.", 'red')
 
     def output(self, args):
-        self.ash.current_context.print_stdout()
+        job = self.ash.current_context
+        was_finished = bool(getattr(job, 'finished', False))
+        job.print_stdout()
+        if not was_finished and getattr(job, 'finished', False):
+            notify_job_finished(job)
 
     def inventory(self, args):
         self.ash._cd_inventory([str(self.ash.current_context.inventory)])

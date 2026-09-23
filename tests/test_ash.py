@@ -1,5 +1,6 @@
 import io
 import json
+import subprocess
 import unittest
 from collections import namedtuple
 from contextlib import redirect_stdout
@@ -18,6 +19,7 @@ from ash.handlers.job_template import JobTemplateHandler
 from ash.handlers.job import JobHandler
 from ash.handlers.inventory import InventoryHandler
 from ash.handlers.project import ProjectHandler
+from ash.notifications import notify_job_finished
 from ash.object_types import PROJECTS, INVENTORIES, CACHED_OBJECT_TYPES
 
 
@@ -299,6 +301,105 @@ class TestAshBehavior(unittest.TestCase):
             template,
             {"extra_vars": {"environment": "production"}},
         )
+
+    def test_output_notifies_when_followed_job_finishes(self):
+        job = SimpleNamespace(
+            id=42,
+            name="Deploy",
+            status="running",
+            finished=None,
+        )
+
+        def finish_job():
+            job.status = "successful"
+            job.finished = "2026-09-23T12:00:00Z"
+
+        job.print_stdout = Mock(side_effect=finish_job)
+        self.ash.current_context = job
+
+        with patch("ash.handlers.job.notify_job_finished") as notify:
+            self.ash._job_handler.output([])
+
+        notify.assert_called_once_with(job)
+
+    def test_output_does_not_notify_for_already_finished_job(self):
+        job = SimpleNamespace(
+            id=42,
+            name="Deploy",
+            status="successful",
+            finished="2026-09-23T12:00:00Z",
+            print_stdout=Mock(),
+        )
+        self.ash.current_context = job
+
+        with patch("ash.handlers.job.notify_job_finished") as notify:
+            self.ash._job_handler.output([])
+
+        notify.assert_not_called()
+
+    def test_output_does_not_notify_when_follow_is_interrupted(self):
+        job = SimpleNamespace(
+            id=42,
+            name="Deploy",
+            status="running",
+            finished=None,
+            print_stdout=Mock(side_effect=KeyboardInterrupt),
+        )
+        self.ash.current_context = job
+
+        with patch("ash.handlers.job.notify_job_finished") as notify:
+            with self.assertRaises(KeyboardInterrupt):
+                self.ash._job_handler.output([])
+
+        notify.assert_not_called()
+
+    @patch("ash.notifications.shutil.which", return_value=None)
+    @patch("ash.notifications.subprocess.run")
+    def test_notification_is_skipped_when_terminal_notifier_is_absent(
+        self,
+        run,
+        which,
+    ):
+        job = SimpleNamespace(id=42, name="Deploy", status="successful")
+
+        self.assertFalse(notify_job_finished(job))
+
+        which.assert_called_once_with("terminal-notifier")
+        run.assert_not_called()
+
+    @patch("ash.notifications.shutil.which", return_value="/usr/local/bin/terminal-notifier")
+    @patch("ash.notifications.subprocess.run")
+    def test_notification_includes_job_identity_and_status(self, run, which):
+        job = SimpleNamespace(id=42, name="Deploy", status="failed")
+
+        self.assertTrue(notify_job_finished(job))
+
+        which.assert_called_once_with("terminal-notifier")
+        run.assert_called_once_with(
+            [
+                "/usr/local/bin/terminal-notifier",
+                "-title",
+                "ASH - Job finished",
+                "-message",
+                "Job 42 (Deploy) finished with status: failed",
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    @patch("ash.notifications.shutil.which", return_value="/usr/local/bin/terminal-notifier")
+    @patch(
+        "ash.notifications.subprocess.run",
+        side_effect=OSError("notifier disappeared"),
+    )
+    def test_notification_errors_are_silent(self, run, which):
+        job = SimpleNamespace(id=42, name="Deploy", status="failed")
+
+        self.assertFalse(notify_job_finished(job))
+
+        which.assert_called_once_with("terminal-notifier")
+        run.assert_called_once()
 
     def test_ask_extra_vars_uses_yaml_default_and_parses_yaml_edits(self):
         self.ash.current_context = SimpleNamespace(extra_vars=json.dumps({
