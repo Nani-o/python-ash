@@ -31,7 +31,7 @@ class JobTemplateHandler(BaseHandler):
         ash = self.ash
         jobs = ash.current_context.jobs()
         if jobs:
-            ash.display.display_jobs(jobs)
+            ash.display.display_jobs(jobs, projects_by_id=ash.projects_by_id)
         else:
             print("No jobs found for this job template.")
 

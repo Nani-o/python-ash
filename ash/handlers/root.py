@@ -52,7 +52,7 @@ class RootHandler(BaseHandler):
             return
         jobs = ash.aap.get_jobs(filters=filters, result_limit=result_limit)
         if jobs:
-            ash.display.display_jobs(jobs)
+            ash.display.display_jobs(jobs, projects_by_id=ash.projects_by_id)
         else:
             ash.display.print("No jobs found.", 'yellow')
 
@@ -121,7 +121,7 @@ class RootHandler(BaseHandler):
                 sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
                 sys.stdout.flush()
                 if jobs:
-                    ash.display.display_jobs(jobs)
+                    ash.display.display_jobs(jobs, projects_by_id=ash.projects_by_id)
                 self._render_watch_description(terminal_size, args)
                 time.sleep(5)
         finally:

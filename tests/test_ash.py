@@ -13,6 +13,7 @@ from prompt_toolkit.document import Document
 from ash.ash import Ash
 from ash.commands import JT_COMMANDS, ROOT_COMMANDS
 from ash.completer import AshCompleter
+from ash.display import Display
 from ash.handlers.base import BaseHandler
 from ash.handlers.root import RootHandler
 from ash.handlers.job_template import JobTemplateHandler
@@ -20,6 +21,7 @@ from ash.handlers.job import JobHandler
 from ash.handlers.inventory import InventoryHandler
 from ash.handlers.project import ProjectHandler
 from ash.notifications import notify_job_finished
+from ash.models import Job
 from ash.object_types import PROJECTS, INVENTORIES, CACHED_OBJECT_TYPES
 
 
@@ -506,6 +508,45 @@ class TestAshBehavior(unittest.TestCase):
 
         self.ash.aap.get_jobs.assert_not_called()
         self.ash.display.print.assert_called_with("Invalid result_limit value. It should be an integer.", 'red')
+
+    def test_job_commands_render_cached_project_reference(self):
+        revision = 'a1b2c3d' + '0' * 33
+        project = SimpleNamespace(scm_branch='release/v1.2', scm_revision=revision)
+        self.ash.projects_by_id = {7: project}
+        api = Mock(base_url='https://aap.example/')
+        jobs = [Job(api, {
+            'id': 42, 'created': '', 'limit': '', 'name': 'Deploy',
+            'playbook': 'deploy.yml', 'status': 'successful', 'project': 7,
+            'scm_branch': '', 'scm_revision': revision,
+        })]
+        terminal_size = namedtuple('TerminalSize', ['columns', 'lines'])(80, 24)
+
+        for command in ('ls', 'watch', 'jobs'):
+            with self.subTest(command=command):
+                self.ash.display = Display(None)
+                self.ash.display.print = Mock()
+                self.ash.aap = Mock()
+                self.ash.aap.get_jobs.return_value = jobs
+                self.ash.current_context = Mock()
+                self.ash.current_context.jobs.return_value = jobs
+
+                if command == 'ls':
+                    self.ash._root_handler.ls(['jobs'])
+                    self.assertEqual(self.ash.aap.mock_calls, [call.get_jobs(filters={}, result_limit=100)])
+                elif command == 'watch':
+                    with patch('ash.handlers.root.get_terminal_size', return_value=terminal_size), \
+                         patch('ash.handlers.root.time.sleep', side_effect=KeyboardInterrupt), \
+                         redirect_stdout(io.StringIO()):
+                        with self.assertRaises(KeyboardInterrupt):
+                            self.ash._root_handler.watch([])
+                    self.assertEqual(self.ash.aap.mock_calls, [call.get_jobs(filters={}, result_limit=22)])
+                else:
+                    self.ash._jt_handler.jobs([])
+                    self.assertEqual(self.ash.current_context.mock_calls, [call.jobs()])
+                    self.assertEqual(self.ash.aap.mock_calls, [])
+
+                self.assertIn('release/v1.2', self.ash.display.print.call_args.args[0])
+                self.assertEqual(api.mock_calls, [])
 
     def test_watch_renders_description_on_last_line(self):
         terminal_size = namedtuple("TerminalSize", ["columns", "lines"])(80, 24)

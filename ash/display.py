@@ -58,13 +58,13 @@ class Display:
         else:
             return 'white'
 
-    def display_by_columns(self, objects, columns):
+    def display_by_columns(self, objects, columns, value_getter=getattr):
         column_widths = {}
         for col in columns:
             if col in ['created', 'modified', 'finished']:
                 max_len = 11
             else:
-                max_len = max([len(str(getattr(obj, col))) for obj in objects] + [len(col)])
+                max_len = max([len(str(value_getter(obj, col))) for obj in objects] + [len(col)])
             if col == 'limit' and max_len > 30:
                 max_len = 30
             elif col == 'scm_branch' and max_len > 25:
@@ -75,12 +75,36 @@ class Display:
         header = format_str.format(*[col for col in columns])
         self.print(header, 'headers')
         for obj in objects:
-            message = format_str.format(*[self.parse_label(str(getattr(obj, col)), column_widths[col]) for col in columns])
+            message = format_str.format(*[self.parse_label(str(value_getter(obj, col)), column_widths[col]) for col in columns])
             color = self.object_to_color(obj)
             self.print(message, color + '_bold')
 
-    def display_jobs(self, jobs):
-        self.display_by_columns(jobs, ['id', 'created', 'limit', 'name', 'playbook', 'scm_branch', 'status'])
+    def _job_scm_label(self, job, projects_by_id):
+        branch = getattr(job, 'scm_branch', '')
+        if branch:
+            return branch
+
+        revision = getattr(job, 'scm_revision', '')
+        project = projects_by_id.get(getattr(job, 'project', None))
+        if revision and project is not None and revision == getattr(project, 'scm_revision', ''):
+            branch = getattr(project, 'scm_branch', '')
+            if branch:
+                return branch
+
+        return revision[:7] if revision else 'unknown'
+
+    def display_jobs(self, jobs, projects_by_id=None):
+        projects_by_id = projects_by_id or {}
+
+        def value_getter(job, column):
+            if column == 'scm_branch':
+                return self._job_scm_label(job, projects_by_id)
+            return getattr(job, column)
+
+        self.display_by_columns(
+            jobs, ['id', 'created', 'limit', 'name', 'playbook', 'scm_branch', 'status'],
+            value_getter=value_getter,
+        )
 
     def display_job_templates(self, job_templates):
         self.display_by_columns(job_templates, ['id', 'name', 'playbook'])
