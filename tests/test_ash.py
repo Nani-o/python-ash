@@ -548,6 +548,38 @@ class TestAshBehavior(unittest.TestCase):
                 self.assertIn('release/v1.2', self.ash.display.print.call_args.args[0])
                 self.assertEqual(api.mock_calls, [])
 
+    def test_watch_centers_jobs_and_adapts_to_terminal_resize(self):
+        self.ash.display = Display(None)
+        self.ash.display.print = Mock()
+        self.ash.projects_by_id = {}
+        jobs = [Job(Mock(base_url='https://aap.example/'), {
+            'id': 42, 'created': '', 'limit': '', 'name': 'x' * 12,
+            'playbook': 'deploy.yml', 'status': 'successful',
+            'scm_branch': '', 'scm_revision': '',
+        })]
+        self.ash.display.display_jobs(jobs)
+        original_calls = self.ash.display.print.call_args_list[:]
+        table_width = max(len(entry.args[0]) for entry in original_calls)
+        self.ash.display.print.reset_mock()
+        self.ash.aap = Mock()
+        self.ash.aap.get_jobs.return_value = jobs
+        terminal_size = namedtuple('TerminalSize', ['columns', 'lines'])
+
+        with patch('ash.handlers.root.get_terminal_size', side_effect=[
+                 terminal_size(table_width + 2, 24), terminal_size(table_width + 6, 24),
+             ]), patch('ash.handlers.root.time.sleep', side_effect=[None, KeyboardInterrupt]), \
+             redirect_stdout(io.StringIO()):
+            with self.assertRaises(KeyboardInterrupt):
+                self.ash._root_handler.watch([])
+
+        calls = self.ash.display.print.call_args_list
+        self.assertEqual(len(calls), 4)
+        for frame, margin in enumerate((1, 3)):
+            for index, original in enumerate(original_calls):
+                self.assertEqual(calls[frame * 2 + index].args, (
+                    ' ' * margin + original.args[0], original.args[1],
+                ))
+
     def test_watch_renders_description_on_last_line(self):
         terminal_size = namedtuple("TerminalSize", ["columns", "lines"])(80, 24)
         self.ash.api_description = "My AAP instance"

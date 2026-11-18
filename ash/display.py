@@ -7,6 +7,7 @@ import re
 import dateutil.parser
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import FormattedText
+from prompt_toolkit.utils import get_cwidth
 
 from .models import Inventory, Job, JobTemplate, Project
 
@@ -58,7 +59,7 @@ class Display:
         else:
             return 'white'
 
-    def display_by_columns(self, objects, columns, value_getter=getattr):
+    def display_by_columns(self, objects, columns, value_getter=getattr, terminal_width=None):
         column_widths = {}
         for col in columns:
             if col in ['created', 'modified', 'finished']:
@@ -73,11 +74,18 @@ class Display:
 
         format_str = "   ".join([f"{{:<{column_widths[col]}}}" for col in columns])
         header = format_str.format(*[col for col in columns])
-        self.print(header, 'headers')
+        rows = [(header, 'headers')]
         for obj in objects:
             message = format_str.format(*[self.parse_label(str(value_getter(obj, col)), column_widths[col]) for col in columns])
             color = self.object_to_color(obj)
-            self.print(message, color + '_bold')
+            rows.append((message, color + '_bold'))
+
+        margin = ''
+        if terminal_width is not None:
+            table_width = max(get_cwidth(message) for message, _ in rows)
+            margin = ' ' * max(0, (terminal_width - table_width) // 2)
+        for message, color in rows:
+            self.print(margin + message, color)
 
     def _job_scm_label(self, job, projects_by_id):
         branch = getattr(job, 'scm_branch', '')
@@ -93,7 +101,7 @@ class Display:
 
         return revision[:7] if revision else 'unknown'
 
-    def display_jobs(self, jobs, projects_by_id=None):
+    def display_jobs(self, jobs, projects_by_id=None, terminal_width=None):
         projects_by_id = projects_by_id or {}
 
         def value_getter(job, column):
@@ -103,7 +111,7 @@ class Display:
 
         self.display_by_columns(
             jobs, ['id', 'created', 'limit', 'name', 'playbook', 'scm_branch', 'status'],
-            value_getter=value_getter,
+            value_getter=value_getter, terminal_width=terminal_width,
         )
 
     def display_job_templates(self, job_templates):

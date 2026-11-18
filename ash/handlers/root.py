@@ -121,7 +121,10 @@ class RootHandler(BaseHandler):
                 sys.stdout.write('\033[J')  # Clear from cursor to the end of the screen
                 sys.stdout.flush()
                 if jobs:
-                    ash.display.display_jobs(jobs, projects_by_id=ash.projects_by_id)
+                    ash.display.display_jobs(
+                        jobs, projects_by_id=ash.projects_by_id,
+                        terminal_width=terminal_size.columns,
+                    )
                 self._render_watch_description(terminal_size, args)
                 time.sleep(5)
         finally:

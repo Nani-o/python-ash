@@ -3,6 +3,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+from prompt_toolkit.utils import get_cwidth
+
 from ash.display import Display
 from ash.models import Job
 
@@ -88,6 +90,46 @@ class TestJobDisplay(unittest.TestCase):
                 self.assert_scm_label(self.make_job(), {7: project}, expected)
                 header = self.display.print.call_args_list[0].args[0]
                 self.assertEqual(header.index('status') - header.index('scm_branch'), min(len(branch), 25) + 3)
+
+    def test_centering_uses_formatted_job_labels(self):
+        job = self.make_job(limit='x' * 100, scm_branch='release/' + 'x' * 100)
+        self.display.display_jobs([job])
+        original_calls = self.display.print.call_args_list[:]
+        table_width = max(get_cwidth(entry.args[0]) for entry in original_calls)
+        self.display.print.reset_mock()
+
+        self.display.display_jobs([job], terminal_width=table_width + 2)
+
+        for original, centered in zip(original_calls, self.display.print.call_args_list):
+            self.assertEqual(centered.args, (' ' + original.args[0], original.args[1]))
+
+
+class TestTableCentering(unittest.TestCase):
+    def test_centers_the_whole_table_when_it_fits(self):
+        cases = [
+            ('78 columns in 80', 'x' * 78, 80, 1),
+            ('odd spare width', 'x' * 77, 80, 1),
+            ('exact fit', 'x' * 80, 80, 0),
+            ('overflow', 'x' * 81, 80, 0),
+            ('wide characters', '\u754c' * 39, 80, 1),
+            ('combining characters', 'e\u0301' * 39, 80, 1),
+        ]
+        for name, label, terminal_width, expected_margin in cases:
+            with self.subTest(name=name):
+                display = Display(None)
+                display.print = Mock()
+                objects = [SimpleNamespace(name=label), SimpleNamespace(name='short')]
+                display.display_by_columns(objects, ['name'])
+                original_calls = display.print.call_args_list[:]
+                display.print.reset_mock()
+
+                display.display_by_columns(objects, ['name'], terminal_width=terminal_width)
+
+                self.assertEqual(display.print.call_count, len(original_calls))
+                for original, centered in zip(original_calls, display.print.call_args_list):
+                    self.assertEqual(centered.args, (
+                        ' ' * expected_margin + original.args[0], original.args[1],
+                    ))
 
 
 if __name__ == '__main__':
