@@ -576,9 +576,8 @@ class TestAshBehavior(unittest.TestCase):
         self.assertEqual(len(calls), 4)
         for frame, margin in enumerate((1, 3)):
             for index, original in enumerate(original_calls):
-                self.assertEqual(calls[frame * 2 + index].args, (
-                    ' ' * margin + original.args[0], original.args[1],
-                ))
+                self.assertEqual(calls[frame * 2 + index].args, original.args)
+                self.assertEqual(calls[frame * 2 + index].kwargs, {'prefix': ' ' * margin})
 
     def test_watch_renders_description_on_last_line(self):
         terminal_size = namedtuple("TerminalSize", ["columns", "lines"])(80, 24)

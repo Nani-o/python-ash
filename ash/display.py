@@ -16,11 +16,13 @@ class Display:
     def __init__(self, style):
         self.style = style
 
-    def print(self, message, class_name=None, attrs=None, end='\n'):
+    def print(self, message, class_name=None, attrs=None, end='\n', prefix=''):
         if class_name:
-            print_formatted_text(FormattedText([(f'class:{class_name}', message)]), style=self.style, end=end)
+            print_formatted_text(FormattedText([
+                ('', prefix), (f'class:{class_name}', message),
+            ]), style=self.style, end=end)
         else:
-            print(message, end=end)
+            print(prefix, message, sep='', end=end)
 
     def parse_label(self, label, max_length=None):
         # if string is ISO datetime, parse and format it
@@ -85,7 +87,7 @@ class Display:
             table_width = max(get_cwidth(message) for message, _ in rows)
             margin = ' ' * max(0, (terminal_width - table_width) // 2)
         for message, color in rows:
-            self.print(margin + message, color)
+            self.print(message, color, prefix=margin)
 
     def _job_scm_label(self, job, projects_by_id):
         branch = getattr(job, 'scm_branch', '')

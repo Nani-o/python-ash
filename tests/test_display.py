@@ -3,8 +3,12 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+from prompt_toolkit.application import create_app_session
+from prompt_toolkit.output import DummyOutput
+from prompt_toolkit.styles import Style
 from prompt_toolkit.utils import get_cwidth
 
+from ash.colors import COLORS
 from ash.display import Display
 from ash.models import Job
 
@@ -101,10 +105,45 @@ class TestJobDisplay(unittest.TestCase):
         self.display.display_jobs([job], terminal_width=table_width + 2)
 
         for original, centered in zip(original_calls, self.display.print.call_args_list):
-            self.assertEqual(centered.args, (' ' + original.args[0], original.args[1]))
+            self.assertEqual(centered.args, original.args)
+            self.assertEqual(centered.kwargs, {'prefix': ' '})
 
 
 class TestTableCentering(unittest.TestCase):
+    def test_header_underline_starts_after_centering_margin(self):
+        class RecordingOutput(DummyOutput):
+            def __init__(self):
+                self.cells = []
+                self.underline = False
+
+            def set_attributes(self, attrs, color_depth):
+                self.underline = attrs.underline
+
+            def reset_attributes(self):
+                self.underline = False
+
+            def write(self, data):
+                self.cells.extend((char, self.underline) for char in data)
+
+        for margin in (0, 1, 3):
+            with self.subTest(margin=margin):
+                output = RecordingOutput()
+                display = Display(Style.from_dict(COLORS))
+                with create_app_session(output=output):
+                    display.display_by_columns(
+                        [SimpleNamespace(name='short')], ['name'],
+                        terminal_width=5 + margin * 2,
+                    )
+
+                text = ''.join(char for char, _ in output.cells)
+                self.assertEqual(text.splitlines(), [
+                    ' ' * margin + 'name ', ' ' * margin + 'short',
+                ])
+                self.assertTrue(all(not underline for _, underline in output.cells[:margin]))
+                self.assertTrue(all(underline for _, underline in output.cells[margin:margin + 5]))
+                row_start = text.index('short')
+                self.assertTrue(all(not underline for _, underline in output.cells[row_start:row_start + 5]))
+
     def test_centers_the_whole_table_when_it_fits(self):
         cases = [
             ('78 columns in 80', 'x' * 78, 80, 1),
@@ -127,9 +166,8 @@ class TestTableCentering(unittest.TestCase):
 
                 self.assertEqual(display.print.call_count, len(original_calls))
                 for original, centered in zip(original_calls, display.print.call_args_list):
-                    self.assertEqual(centered.args, (
-                        ' ' * expected_margin + original.args[0], original.args[1],
-                    ))
+                    self.assertEqual(centered.args, original.args)
+                    self.assertEqual(centered.kwargs, {'prefix': ' ' * expected_margin})
 
 
 if __name__ == '__main__':
